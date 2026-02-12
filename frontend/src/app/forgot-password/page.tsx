@@ -32,7 +32,7 @@ export default async function ForgotPassword({
                 Back to Login
             </Link>
 
-            <form className="animate-in flex-1 flex flex-col w-full sm:max-w-md mx-auto justify-center gap-2 text-foreground relative z-10">
+            <form className="animate-in flex-1 flex flex-col w-full sm:max-w-md mx-auto justify-center pt-24 gap-2 text-foreground relative z-10">
                 <h1 className="text-2xl sm:text-4xl font-bold mb-4 sm:mb-6 text-center text-transparent bg-clip-text bg-gradient-to-r from-green-500 to-teal-500">
                     Reset Password
                 </h1>
@@ -41,11 +41,11 @@ export default async function ForgotPassword({
                     Enter your email address and we'll send you a link to reset your password.
                 </p>
 
-                <label className="text-sm sm:text-md" htmlFor="email">
+                <label className="text-sm sm:text-md text-center" htmlFor="email">
                     Email
                 </label>
                 <input
-                    className="rounded-md px-3 sm:px-4 py-2 bg-inherit border mb-4 sm:mb-6 text-sm sm:text-base"
+                    className="rounded-md px-3 sm:px-4 py-2 bg-inherit border mb-4 sm:mb-6 text-sm sm:text-base text-center"
                     name="email"
                     placeholder="you@example.com"
                     required
@@ -65,7 +65,7 @@ export default async function ForgotPassword({
                 )}
             </form>
 
-            <Footer/>
+            <Footer />
         </div>
     )
 }

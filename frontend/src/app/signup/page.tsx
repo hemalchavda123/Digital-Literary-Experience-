@@ -33,32 +33,32 @@ export default async function Signup({
                 Back
             </Link>
 
-            <form className="animate-in flex-1 flex flex-col w-full sm:max-w-md mx-auto justify-center gap-2 text-foreground relative z-10">
+            <form className="animate-in flex-1 flex flex-col w-full sm:max-w-md mx-auto justify-center pt-24 gap-2 text-foreground relative z-10">
                 <h1 className="text-2xl sm:text-4xl font-bold mb-4 sm:mb-6 text-center text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-300">
                     Create Account
                 </h1>
 
-                <label className="text-sm sm:text-md" htmlFor="username">
+                <label className="text-sm sm:text-md text-center" htmlFor="username">
                     Username
                 </label>
                 <input
-                    className="rounded-md px-3 sm:px-4 py-2 bg-inherit border mb-4 sm:mb-6 text-sm sm:text-base"
+                    className="rounded-md px-3 sm:px-4 py-2 bg-inherit border mb-4 sm:mb-6 text-sm sm:text-base text-center"
                     name="username"
                     placeholder="LiteraryExplorer"
                     required
                 />
 
-                <label className="text-sm sm:text-md" htmlFor="email">
+                <label className="text-sm sm:text-md text-center" htmlFor="email">
                     Email
                 </label>
                 <input
-                    className="rounded-md px-3 sm:px-4 py-2 bg-inherit border mb-4 sm:mb-6 text-sm sm:text-base"
+                    className="rounded-md px-3 sm:px-4 py-2 bg-inherit border mb-4 sm:mb-6 text-sm sm:text-base text-center"
                     name="email"
                     placeholder="you@example.com"
                     required
                 />
 
-                <label className="text-sm sm:text-md" htmlFor="password">
+                <label className="text-sm sm:text-md text-center" htmlFor="password">
                     Password
                 </label>
                 <PasswordInput
@@ -66,13 +66,14 @@ export default async function Signup({
                     placeholder="••••••••"
                     required
                     minLength={6}
+                    className="text-center"
                 />
 
                 {/* Note: Confirm password logic is usually client-side validation or handled in action. 
             For simplicity with purely server actions, we rely on basic action handling or could add client-side JS.
             I will add a simple confirm password field but proper validation usually requires client state or zod.
         */}
-                <label className="text-sm sm:text-md" htmlFor="confirmPassword">
+                <label className="text-sm sm:text-md text-center" htmlFor="confirmPassword">
                     Confirm Password
                 </label>
                 <PasswordInput
@@ -80,6 +81,7 @@ export default async function Signup({
                     placeholder="••••••••"
                     required
                     minLength={6}
+                    className="text-center"
                 />
 
                 <button
@@ -103,7 +105,7 @@ export default async function Signup({
                 )}
             </form>
 
-            <Footer/>
+            <Footer />
         </div>
     )
 }

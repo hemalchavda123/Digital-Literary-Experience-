@@ -33,30 +33,31 @@ export default async function Login({
                 Back
             </Link>
 
-            <form className="animate-in flex-1 flex flex-col w-full sm:max-w-md mx-auto justify-center gap-2 text-foreground relative z-10">
-                <h1 className="text-2xl sm:text-4xl font-bold mb-4 sm:mb-6 text-center text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-600">
+            <form className="animate-in flex-1 flex flex-col w-full sm:max-w-md mx-auto justify-center pt-24 gap-2 text-foreground relative z-10">
+                <h1 className="text-2xl sm:text-4xl font-bold mb-4 sm:mb-6 text-center text-white">
                     Welcome Back
                 </h1>
 
-                <label className="text-sm sm:text-md" htmlFor="email">
+                <label className="text-sm sm:text-md text-center" htmlFor="email">
                     Email
                 </label>
                 <input
-                    className="rounded-md px-3 sm:px-4 py-2 bg-inherit border mb-4 sm:mb-6 text-sm sm:text-base"
+                    className="rounded-md px-3 sm:px-4 py-2 bg-inherit border mb-4 sm:mb-6 text-sm sm:text-base text-center"
                     name="email"
                     placeholder="you@example.com"
                     required
                 />
-                <label className="text-sm sm:text-md" htmlFor="password">
+                <label className="text-sm sm:text-md text-center" htmlFor="password">
                     Password
                 </label>
                 <PasswordInput
                     name="password"
                     placeholder="••••••••"
                     required
+                    className="text-center"
                 />
 
-                <div className="flex justify-end mb-4 sm:mb-6">
+                <div className="flex justify-center mb-4 sm:mb-6">
                     <Link href="/forgot-password" className="text-xs sm:text-sm text-blue-500 hover:underline">
                         Forgot Password?
                     </Link>
