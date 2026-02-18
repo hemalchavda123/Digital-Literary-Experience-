@@ -10,7 +10,7 @@ export default async function ForgotPassword({
     const params = await searchParams
     return (
         <div className="flex-1 flex flex-col w-full px-4 sm:px-8 justify-center gap-2 mx-auto min-h-screen" style={{ backgroundImage: 'url(/login_background.jpeg)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' }}>
-            <div className="absolute inset-0 bg-black/40"></div>
+            <div className="absolute inset-0" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}></div>
             <Link
                 href="/login"
                 className="absolute left-4 sm:left-8 top-4 sm:top-8 py-2 px-3 sm:px-4 rounded-md no-underline text-foreground bg-btn-background hover:bg-btn-background-hover flex items-center group text-xs sm:text-sm z-10"
@@ -33,11 +33,11 @@ export default async function ForgotPassword({
             </Link>
 
             <form className="animate-in flex-1 flex flex-col w-full sm:max-w-md mx-auto justify-center pt-24 gap-2 text-foreground relative z-10">
-                <h1 className="text-2xl sm:text-4xl font-bold mb-4 sm:mb-6 text-center text-transparent bg-clip-text bg-gradient-to-r from-green-500 to-teal-500">
+                <h1 className="text-2xl sm:text-4xl font-bold mb-4 sm:mb-6 text-center bg-clip-text" style={{ backgroundImage: 'linear-gradient(to right,#16a34a,#14b8a6)', color: 'transparent' }}>
                     Reset Password
                 </h1>
 
-                <p className="text-center text-sm text-gray-500 mb-4 sm:mb-6">
+                <p className="text-center text-sm mb-4 sm:mb-6" style={{ color: '#6b7280' }}>
                     Enter your email address and we'll send you a link to reset your password.
                 </p>
 
@@ -53,13 +53,14 @@ export default async function ForgotPassword({
 
                 <button
                     formAction={forgotPassword}
-                    className="bg-green-600 rounded-md px-3 sm:px-4 py-2 text-foreground hover:bg-green-700 mb-2 transition-colors duration-200 text-sm sm:text-base"
+                    className="rounded-md px-3 sm:px-4 py-2 mb-2 transition-colors duration-200 text-sm sm:text-base"
+                    style={{ backgroundColor: '#16a34a', color: '#ffffff' }}
                 >
                     Send Reset Link
                 </button>
 
                 {params?.message && (
-                    <p className="mt-3 sm:mt-4 p-3 sm:p-4 bg-foreground/10 text-foreground text-center text-xs sm:text-sm">
+                    <p className="mt-3 sm:mt-4 p-3 sm:p-4 text-center text-xs sm:text-sm" style={{ backgroundColor: 'rgba(255,255,255,0.08)', color: '#ffffff' }}>
                         {params.message}
                     </p>
                 )}

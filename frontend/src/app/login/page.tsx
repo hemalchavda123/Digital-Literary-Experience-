@@ -11,7 +11,7 @@ export default async function Login({
     const params = await searchParams
     return (
         <div className="flex-1 flex flex-col w-full px-4 sm:px-8 justify-center gap-2 mx-auto min-h-screen" style={{ backgroundImage: 'url(/login_background.jpeg)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' }}>
-            <div className="absolute inset-0 bg-black/40"></div>
+            <div className="absolute inset-0" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}></div>
             <Link
                 href="/"
                 className="absolute left-4 sm:left-8 top-4 sm:top-8 py-2 px-3 sm:px-4 rounded-md no-underline text-foreground bg-btn-background hover:bg-btn-background-hover flex items-center group text-xs sm:text-sm z-10"
@@ -34,7 +34,7 @@ export default async function Login({
             </Link>
 
             <form className="animate-in flex-1 flex flex-col w-full sm:max-w-md mx-auto justify-center pt-24 gap-2 text-foreground relative z-10">
-                <h1 className="text-2xl sm:text-4xl font-bold mb-4 sm:mb-6 text-center text-white">
+                <h1 className="text-2xl sm:text-4xl font-bold mb-4 sm:mb-6 text-center" style={{ color: '#ffffff' }}>
                     Welcome Back
                 </h1>
 
@@ -58,27 +58,28 @@ export default async function Login({
                 />
 
                 <div className="flex justify-center mb-4 sm:mb-6">
-                    <Link href="/forgot-password" className="text-xs sm:text-sm text-blue-500 hover:underline">
+                    <Link href="/forgot-password" className="text-xs sm:text-sm hover:underline" style={{ color: '#3b82f6' }}>
                         Forgot Password?
                     </Link>
                 </div>
 
                 <button
                     formAction={login}
-                    className="bg-blue-600 rounded-md px-3 sm:px-4 py-2 text-foreground hover:bg-blue-700 mb-2 transition-colors duration-200 text-sm sm:text-base"
+                    className="rounded-md px-3 sm:px-4 py-2 mb-2 transition-colors duration-200 text-sm sm:text-base"
+                    style={{ backgroundColor: '#2563eb', color: '#ffffff' }}
                 >
                     Sign In
                 </button>
 
                 <div className="text-center text-xs sm:text-sm mt-3 sm:mt-4">
                     Don't have an account?{' '}
-                    <Link href="/signup" className="text-blue-500 hover:underline">
+                    <Link href="/signup" className="hover:underline" style={{ color: '#3b82f6' }}>
                         Sign Up
                     </Link>
                 </div>
 
                 {params?.message && (
-                    <p className="mt-3 sm:mt-4 p-3 sm:p-4 bg-foreground/10 text-foreground text-center text-xs sm:text-sm">
+                    <p className="mt-3 sm:mt-4 p-3 sm:p-4 text-center text-xs sm:text-sm" style={{ backgroundColor: 'rgba(255,255,255,0.08)', color: '#ffffff' }}>
                         {params.message}
                     </p>
                 )}
