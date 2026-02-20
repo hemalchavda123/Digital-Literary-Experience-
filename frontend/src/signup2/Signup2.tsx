@@ -1,135 +1,321 @@
 "use client"
-import React, { useState } from "react"
+
+import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import Navbar from '@/components/Navbar'
-import Footer from '@/components/Footer'
+import Navbar from "@/components/Navbar"
+import Footer from "@/components/Footer"
 
 export default function Signup2(): JSX.Element {
-  const [viewIndex, setViewIndex] = useState<number>(0) // 0=signup,1=login,2=post
+  const [viewIndex, setViewIndex] = useState<number>(0) // 0=signup,1=login,2=forgot,3=post
+  const [isMobile, setIsMobile] = useState<boolean>(false)
   const router = useRouter()
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 900)
+    }
+    handleResize()
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
+  }, [])
 
   function handleSignIn(e?: React.FormEvent) {
     e?.preventDefault()
     setViewIndex(3)
-    setTimeout(() => router.push("/home"), 350)
+    setTimeout(() => router.push("/home"), 600)
   }
 
-  const navWrapStyle: React.CSSProperties = {
-    position: 'fixed',
-    left: 0,
-    right: 0,
-    top: 0,
-    transform: viewIndex === 3 ? 'translateY(0)' : 'translateY(-120%)',
-    transition: 'transform 520ms cubic-bezier(.2,.95,.2,1)',
-    zIndex: 60,
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "12px 14px",
+    borderRadius: 12,
+    border: "1px solid #e6e6e6",
+    fontSize: 15,
+    boxSizing: "border-box",
   }
 
-  const footerWrapStyle: React.CSSProperties = {
-    position: 'fixed',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    transform: viewIndex === 3 ? 'translateY(0)' : 'translateY(120%)',
-    transition: 'transform 520ms cubic-bezier(.2,.95,.2,1)',
-    zIndex: 60,
+  const primaryButtonStyle: React.CSSProperties = {
+    width: "100%",
+    backgroundColor: "#6b3f2c",
+    color: "#ffffff",
+    padding: "12px",
+    borderRadius: 12,
+    border: "none",
+    fontWeight: 700,
+    cursor: "pointer",
   }
 
-  const leftColTransformStyle: React.CSSProperties = {
-    transform: viewIndex === 3 ? 'translateX(-60px)' : 'translateX(0)',
-    transition: 'transform 520ms cubic-bezier(.2,.95,.2,1)',
-  }
-
-  const rightColTransformStyle: React.CSSProperties = {
-    transform: viewIndex === 3 ? 'translateX(-60px) scale(1.02)' : 'translateX(0) scale(1)',
-    transition: 'transform 520ms cubic-bezier(.2,.95,.2,1)',
+  const linkStyle: React.CSSProperties = {
+    marginTop: 16,
+    background: "none",
+    border: "none",
+    color: "#6b3f2c",
+    cursor: "pointer",
+    fontSize: 14,
+    padding: 0,
   }
 
   return (
-    <div className="min-h-screen w-full" style={{ backgroundColor: '#ffffff' }}>
-      <div style={navWrapStyle} aria-hidden={viewIndex !== 3}>
+    <div
+      style={{
+        height: "100vh",
+        width: "100vw",
+        overflow: "hidden",
+        backgroundColor: "#ffffff",
+        position: "relative",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* Animated Navbar */}
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          transform: viewIndex === 3 ? "translateY(0)" : "translateY(-120%)",
+          transition: "transform 500ms cubic-bezier(.2,.95,.2,1)",
+          zIndex: 50,
+        }}
+      >
         <Navbar />
       </div>
-      <header className="w-full">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 min-h-[70vh]">
-            <div className="flex items-center" style={{ backgroundColor: '#a17038', ...leftColTransformStyle }}>
-              <div className="p-8 sm:p-12 lg:p-16">
-                <h2 className="text-3xl sm:text-5xl font-extrabold mb-6" style={{ color: '#000000' }}>Lorem ipsum.</h2>
-                <p className="text-sm sm:text-base max-w-md mb-8" style={{ color: '#0f120f' }}>Discover and create literary projects with a beautiful, distraction-free workspace.</p>
 
-                <div style={{ display: 'flex', justifyContent: 'center' }}>
-                  <div style={{ width: 460, height: 520, borderRadius: 12, boxShadow: '0 16px 40px rgba(0,0,0,0.14)', overflow: 'hidden', backgroundColor: '#ffffff' }}>
-                    <div style={{ width: '100%', height: '100%', overflow: 'hidden', padding: 24, boxSizing: 'border-box' }}>
-                      <div style={{ width: '400%', height: '100%', display: 'flex', transform: `translateX(-${viewIndex * 25}%)`, transition: 'transform 360ms cubic-bezier(.2,.95,.2,1)' }}>
-                        {/* Signup slide */}
-                        <div style={{ width: '25%', paddingRight: 25, boxSizing: 'border-box', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
-                          <h3 style={{ margin: 0, color: '#111' }}>Create account</h3>
-                          <p style={{ margin: '6px 0 12px', color: '#555' }}>Join us — it only takes a minute.</p>
-                          <form onSubmit={handleSignIn} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            <input placeholder="Full name" style={{ padding: 10, borderRadius: 8, border: '1px solid #e6e6e6' }} />
-                            <input placeholder="Email" style={{ padding: 10, borderRadius: 8, border: '1px solid #e6e6e6' }} />
-                            <input type="password" placeholder="Password" style={{ padding: 10, borderRadius: 8, border: '1px solid #e6e6e6' }} />
-                            <button type="submit" style={{ backgroundColor: '#6b3f2c', color: '#fff', padding: '10px 12px', borderRadius: 8, border: 'none', fontWeight: 700 }}>Sign up</button>
-                          </form>
-                          <div style={{ marginTop: 10 }}>
-                            <button style={{ background: 'none', border: 'none', color: '#6b3f2c', cursor: 'pointer' }} onClick={() => setViewIndex(1)}>Already have an account? Login</button>
-                          </div>
-                        </div>
+      {/* Main Layout */}
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: isMobile ? "column" : "row",
+          height: "100%",
+        }}
+      >
+        {/* Left Column */}
+        <div
+          style={{
+            flex: 1,
+            backgroundColor: "#a17038",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: isMobile ? 30 : 60,
+          }}
+        >
+          <div style={{ width: "100%", maxWidth: 420 }}>
+            <h2
+              style={{
+                fontSize: isMobile ? 28 : 48,
+                fontWeight: 800,
+                marginBottom: 20,
+                color: "#000",
+              }}
+            >
+              Lorem ipsum.
+            </h2>
 
-                        {/* Login slide */}
-                        <div style={{ width: '25%', paddingRight: 23, boxSizing: 'border-box' }}>
-                          <h3 style={{ margin: 0, color: '#111' }}>Welcome back</h3>
-                          <p style={{ margin: '6px 0 12px', color: '#555' }}>Sign in to continue</p>
-                          <form onSubmit={handleSignIn} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            <input placeholder="Email" style={{ padding: 12, borderRadius: 10, border: '1px solid #e6e6e6', fontSize: 15 }} />
-                            <input type="password" placeholder="Password" style={{ padding: 12, borderRadius: 10, border: '1px solid #e6e6e6', fontSize: 15 }} />
-                            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                              <button type="button" onClick={() => setViewIndex(2)} style={{ background: 'none', border: 'none', color: '#6b3f2c', cursor: 'pointer', fontSize: 14 }}>Forgot password?</button>
-                            </div>
-                            <button type="submit" style={{ backgroundColor: '#6b3f2c', color: '#fff', padding: '12px 14px', borderRadius: 10, border: 'none', fontWeight: 700, fontSize: 16 }}>Sign in</button>
-                          </form>
-                          <div style={{ marginTop: 10 }}>
-                            <button style={{ background: 'none', border: 'none', color: '#6b3f2c', cursor: 'pointer', fontSize: 15 }} onClick={() => setViewIndex(0)}>Create account</button>
-                          </div>
-                        </div>
+            <p
+              style={{
+                marginBottom: 30,
+                fontSize: 15,
+                color: "#0f120f",
+              }}
+            >
+              Discover and create literary projects with a beautiful,
+              distraction-free workspace.
+            </p>
 
-                        {/* Forgot Password slide */}
-                        <div style={{ width: '25%', padding: 23, boxSizing: 'border-box' }}>
-                          <h3 style={{ margin: 0, color: '#111' }}>Reset password</h3>
-                          <p style={{ margin: '6px 0 12px', color: '#555' }}>We’ll send a link to your email.</p>
-                          <form onSubmit={(e) => { e.preventDefault(); setViewIndex(1); }} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            <input placeholder="Email" style={{ padding: 10, borderRadius: 8, border: '1px solid #e6e6e6' }} />
-                            <button type="submit" style={{ backgroundColor: '#6b3f2c', color: '#fff', padding: '10px 12px', borderRadius: 8, border: 'none', fontWeight: 700 }}>Send reset link</button>
-                          </form>
-                          <div style={{ marginTop: 8 }}>
-                            <button style={{ background: 'none', border: 'none', color: '#6b3f2c', cursor: 'pointer' }} onClick={() => setViewIndex(1)}>Back to login</button>
-                          </div>
-                        </div>
+            {/* Card */}
+            <div
+              style={{
+                width: "100%",
+                backgroundColor: "#ffffff",
+                borderRadius: 20,
+                boxShadow: "0 30px 60px rgba(0,0,0,0.18)",
+                padding: 32,
+                boxSizing: "border-box",
+              }}
+            >
+              <div style={{ overflow: "hidden", width: "100%" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    transition:
+                      "transform 320ms cubic-bezier(.2,.95,.2,1)",
+                    transform: `translateX(-${viewIndex * 100}%)`,
+                  }}
+                >
+                  {/* SIGNUP */}
+                  <div style={{ width: "100%", flexShrink: 0 }}>
+                    <h3 style={{ margin: 0, fontSize: 22, color: "#000" }}>
+                      Create account
+                    </h3>
+                    <p style={{ margin: "6px 0 18px", color: "#666" }}>
+                      Join us — it only takes a minute.
+                    </p>
 
-                        {/* Post-sign slide */}
-                        <div style={{ width: '25%', boxSizing: 'border-box', padding: 28 }}>
-                          <h3 style={{ margin: 0, color: '#111' }}>All set</h3>
-                          <p style={{ margin: '6px 0 12px', color: '#555' }}>Redirecting to the app…</p>
-                        </div>
-                      </div>
-                    </div>
+                    <form
+                      onSubmit={handleSignIn}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 14,
+                      }}
+                    >
+                      <input placeholder="Full name" style={inputStyle} />
+                      <input placeholder="Email" style={inputStyle} />
+                      <input
+                        type="password"
+                        placeholder="Password"
+                        style={inputStyle}
+                      />
+                      <button type="submit" style={primaryButtonStyle}>
+                        Sign up
+                      </button>
+                    </form>
+
+                    <button
+                      onClick={() => setViewIndex(1)}
+                      style={linkStyle}
+                    >
+                      Already have an account? Login
+                    </button>
+                  </div>
+
+                  {/* LOGIN */}
+                  <div style={{ width: "100%", flexShrink: 0 }}>
+                    <h3 style={{ margin: 0, fontSize: 22, color: "#000" }}>
+                      Welcome back
+                    </h3>
+                    <p style={{ margin: "6px 0 18px", color: "#666" }}>
+                      Sign in to continue
+                    </p>
+
+                    <form
+                      onSubmit={handleSignIn}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 14,
+                      }}
+                    >
+                      <input placeholder="Email" style={inputStyle} />
+                      <input
+                        type="password"
+                        placeholder="Password"
+                        style={inputStyle}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => setViewIndex(2)}
+                        style={{
+                          ...linkStyle,
+                          textAlign: "right",
+                          marginTop: -6,
+                        }}
+                      >
+                        Forgot password?
+                      </button>
+
+                      <button type="submit" style={primaryButtonStyle}>
+                        Sign in
+                      </button>
+                    </form>
+
+                    <button
+                      onClick={() => setViewIndex(0)}
+                      style={linkStyle}
+                    >
+                      Create account
+                    </button>
+                  </div>
+
+                  {/* FORGOT */}
+                  <div style={{ width: "100%", flexShrink: 0 }}>
+                    <h3 style={{ margin: 0, fontSize: 22, color: "#000" }}>
+                      Reset password
+                    </h3>
+                    <p style={{ margin: "6px 0 18px", color: "#666" }}>
+                      We’ll send a link to your email.
+                    </p>
+
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        setViewIndex(1)
+                      }}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 14,
+                      }}
+                    >
+                      <input placeholder="Email" style={inputStyle} />
+                      <button type="submit" style={primaryButtonStyle}>
+                        Send reset link
+                      </button>
+                    </form>
+
+                    <button
+                      onClick={() => setViewIndex(1)}
+                      style={linkStyle}
+                    >
+                      Back to login
+                    </button>
+                  </div>
+
+                  {/* POST */}
+                  <div
+                    style={{
+                      width: "100%",
+                      flexShrink: 0,
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <h3 style={{ margin: 0, fontSize: 22 }}>
+                      All set
+                    </h3>
+                    <p style={{ marginTop: 10, color: "#666" }}>
+                      Redirecting to the app…
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
-
-            <div className="hidden md:block bg-cover bg-center" style={{ backgroundImage: "url('/home_background.png')", ...rightColTransformStyle }} />
           </div>
         </div>
-      </header>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <p className="text-center" style={{ color: '#6b7280' }}>Start a new project, explore collections, or continue where you left off.</p>
-      </main>
-      <div style={footerWrapStyle} aria-hidden={viewIndex !== 3}>
+        {/* Right Column */}
+        {!isMobile && (
+          <div
+            style={{
+              flex: 1,
+              backgroundImage: "url('/home_background.png')",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
+          />
+        )}
+      </div>
+
+      {/* Animated Footer */}
+      <div
+        style={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          transform:
+            viewIndex === 3 ? "translateY(0)" : "translateY(120%)",
+          transition: "transform 500ms cubic-bezier(.2,.95,.2,1)",
+          zIndex: 50,
+        }}
+      >
         <Footer />
       </div>
     </div>
-
   )
 }
