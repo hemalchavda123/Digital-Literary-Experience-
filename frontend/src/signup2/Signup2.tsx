@@ -32,6 +32,7 @@ export default function Signup2(): JSX.Element {
     border: "1px solid #e6e6e6",
     fontSize: 15,
     boxSizing: "border-box",
+    color: "#333"
   }
 
   const primaryButtonStyle: React.CSSProperties = {
