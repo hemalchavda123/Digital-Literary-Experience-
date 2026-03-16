@@ -99,13 +99,13 @@ export default function Navbar() {
                 }}>
 
                     {/* Logo */}
-                    <Link href="/" style={{
+                    <Link href="/home" style={{
                         fontSize: "20px",
                         fontWeight: 600,
                         textDecoration: "none",
                         color: "#000"
                     }}>
-                        Literary
+                        Digital Literary Experience
                     </Link>
 
                     {/* Center Links */}
