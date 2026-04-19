@@ -11,14 +11,22 @@ type Props = {
 export function CreateProjectModal({ isOpen, onClose }: Props) {
   const { createProject } = useProjects()
   const [name, setName] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   if (!isOpen) return null
 
-  const handleCreate = () => {
-    if (!name.trim()) return
-    createProject(name.trim())
-    setName("")
-    onClose()
+  const handleCreate = async () => {
+    if (!name.trim() || isSubmitting) return
+    setIsSubmitting(true)
+    try {
+      await createProject(name.trim())
+      setName("")
+      onClose()
+    } catch (err) {
+      console.error("Failed to create project:", err)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -31,6 +39,7 @@ export function CreateProjectModal({ isOpen, onClose }: Props) {
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleCreate()}
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black"
           placeholder="My First Novel"
         />
@@ -45,13 +54,13 @@ export function CreateProjectModal({ isOpen, onClose }: Props) {
           <button
             type="button"
             onClick={handleCreate}
-            className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white"
+            disabled={isSubmitting}
+            className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
-            Create
+            {isSubmitting ? "Creating…" : "Create"}
           </button>
         </div>
       </div>
     </div>
   )
 }
-

@@ -19,7 +19,7 @@ function sortProjects(projects: ReturnType<typeof useProjects>["projects"], filt
 }
 
 export default function HomePage() {
-  const { projects } = useProjects()
+  const { projects, loading } = useProjects()
   const [searchQuery, setSearchQuery] = useState("")
   const [filter, setFilter] = useState<"all" | "recent" | "alphabetical">("all")
   const [isCreateOpen, setIsCreateOpen] = useState(false)

@@ -8,6 +8,7 @@ import { AnnotatableText } from "@/components/document/AnnotatableText"
 import { AnnotationSidebar } from "@/components/document/AnnotationSidebar"
 import { LabelManagerModal } from "@/components/document/LabelManagerModal"
 import { TextAnnotation } from "@/types/annotation"
+import type { Document } from "@/types/document"
 import dynamic from "next/dynamic"
 
 const PdfViewer = dynamic(() => import("@/components/pdf/PdfViewer").then(mod => mod.PdfViewer), { ssr: false })
@@ -17,17 +18,48 @@ export default function DocumentPage() {
   const router = useRouter()
   const { getDocumentById, renameDocument, deleteDocument } = useProjects()
   const { fetchLabels, fetchAnnotations } = useAnnotations()
-  const doc = getDocumentById(params.docId)
-  const [title, setTitle] = useState(doc?.title ?? "")
+  const [doc, setDoc] = useState<Document | null>(null)
+  const [docLoading, setDocLoading] = useState(true)
+  const [title, setTitle] = useState("")
   const [showLabelManager, setShowLabelManager] = useState(false)
   const [selectedAnnotations, setSelectedAnnotations] = useState<TextAnnotation[]>([])
 
+  // Fetch document from backend on mount
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setDocLoading(true)
+      const fetched = await getDocumentById(params.docId)
+      if (!cancelled) {
+        setDoc(fetched)
+        setTitle(fetched?.title ?? "")
+        setDocLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [params.docId, getDocumentById])
+
+  // Fetch labels and annotations once doc is loaded
   useEffect(() => {
     if (doc) {
       fetchLabels(doc.projectId)
       fetchAnnotations(doc.id)
     }
   }, [doc, fetchLabels, fetchAnnotations])
+
+  if (docLoading) {
+    return (
+      <div className="min-h-screen w-full flex flex-col bg-white">
+        <header className="h-12 border-b border-gray-200 flex items-center px-4 text-sm">
+          <span className="font-medium text-gray-500">Loading…</span>
+        </header>
+        <main className="flex-1 flex items-center justify-center">
+          <p className="text-sm text-gray-500">Loading document…</p>
+        </main>
+      </div>
+    )
+  }
 
   if (!doc) {
     return (
@@ -49,25 +81,29 @@ export default function DocumentPage() {
     )
   }
 
-  const handleTitleBlur = () => {
+  const handleTitleBlur = async () => {
     if (title.trim() && title.trim() !== doc.title) {
-      renameDocument(doc.id, title.trim())
+      await renameDocument(doc.id, title.trim())
+      setDoc({ ...doc, title: title.trim() })
     } else {
       setTitle(doc.title)
     }
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     const confirmed = window.confirm("Delete this document?")
     if (!confirmed) return
     const projectId = doc.projectId
+    await deleteDocument(doc.id)
     router.push(`/project/${projectId}`)
-    deleteDocument(doc.id)
   }
+
+  // For PDFs stored as base64 data URLs, use the content field directly
+  const pdfSource = doc.kind === "pdf" ? (doc.content || doc.pdfUrl || "") : ""
 
   return (
     <div className="min-h-screen w-full flex flex-col bg-white">
-      {/* Document viewer navbar – title on the left, space for future tools on the right */}
+      {/* Document viewer navbar */}
       <header className="h-12 border-b border-gray-200 flex items-center justify-between px-4 text-sm bg-white">
         <div className="flex items-center gap-3 min-w-0">
           <button
@@ -115,7 +151,7 @@ export default function DocumentPage() {
               <div className="w-full max-w-5xl px-4">
                 <div className="bg-white shadow-md rounded-sm overflow-hidden min-h-[80vh]">
                   <PdfViewer 
-                    doc={doc} 
+                    doc={{ ...doc, pdfUrl: pdfSource }}
                     onAnnotationClick={(anns) => setSelectedAnnotations(anns)}
                   />
                 </div>
@@ -156,4 +192,3 @@ export default function DocumentPage() {
     </div>
   )
 }
-

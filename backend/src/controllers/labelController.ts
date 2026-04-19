@@ -17,11 +17,18 @@ export const getLabelsByProject = async (req: Request, res: Response) => {
 export const createLabel = async (req: Request, res: Response) => {
   try {
     const { projectId, name, color } = req.body;
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
     const newLabel = await prisma.label.create({
       data: {
         projectId,
         name,
         color,
+        userId,
       },
     });
     res.status(201).json(newLabel);

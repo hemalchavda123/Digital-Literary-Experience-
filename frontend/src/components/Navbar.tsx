@@ -2,9 +2,10 @@
 
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
-import { logout } from "@/app/auth/actions"
+import { useRouter } from "next/navigation"
 
 export default function Navbar() {
+    const router = useRouter()
     const [profileOpen, setProfileOpen] = useState(false)
     const [profileImage, setProfileImage] = useState(null)
 
@@ -122,28 +123,25 @@ export default function Navbar() {
                             Make New Project
                         </Button>
 
-                        <form
-                            action={logout}
+                        <button
+                            onClick={() => {
+                                document.cookie = 'accessToken=; path=/; max-age=0'
+                                document.cookie = 'refreshToken=; path=/; max-age=0'
+                                router.push('/signup2')
+                            }}
                             style={{
-                                display: "inline"
+                                padding: "8px 16px",
+                                borderRadius: "6px",
+                                fontSize: "14px",
+                                cursor: "pointer",
+                                border: "1px solid black",
+                                backgroundColor: "#fff",
+                                color: "#000",
+                                transition: "0.2s ease"
                             }}
                         >
-                            <button
-                                type="submit"
-                                style={{
-                                    padding: "8px 16px",
-                                    borderRadius: "6px",
-                                    fontSize: "14px",
-                                    cursor: "pointer",
-                                    border: "1px solid black",
-                                    backgroundColor: "#fff",
-                                    color: "#000",
-                                    transition: "0.2s ease"
-                                }}
-                            >
-                                Sign out
-                            </button>
-                        </form>
+                            Sign out
+                        </button>
 
                         {/* Profile */}
                         <div style={{ position: "relative" }} ref={profileRef}>

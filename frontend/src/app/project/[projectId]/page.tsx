@@ -6,16 +6,41 @@ import Footer from "@/components/Footer"
 import { useProjects } from "@/context/ProjectContext"
 import { DocumentList } from "@/components/project/DocumentList"
 import { CreateDocumentButton } from "@/components/project/CreateDocumentButton"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 export default function ProjectPage() {
   const params = useParams<{ projectId: string }>()
   const router = useRouter()
-  const { projects, getProjectById, documentsForProject, renameProject, deleteProject } = useProjects()
+  const { getProjectById, documentsForProject, fetchDocuments, renameProject, deleteProject, loading } = useProjects()
   const projectId = params.projectId
   const project = getProjectById(projectId)
   const docs = documentsForProject(projectId)
   const [name, setName] = useState(project?.name ?? "")
+  const [docsLoaded, setDocsLoaded] = useState(false)
+
+  // Fetch documents when the project page loads
+  useEffect(() => {
+    if (projectId && !docsLoaded) {
+      fetchDocuments(projectId).then(() => setDocsLoaded(true))
+    }
+  }, [projectId, docsLoaded, fetchDocuments])
+
+  // Sync name when project data arrives
+  useEffect(() => {
+    if (project) setName(project.name)
+  }, [project])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen w-full flex flex-col bg-white">
+        <Navbar />
+        <main className="flex-1 flex items-center justify-center">
+          <p className="text-sm text-gray-500">Loading…</p>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
 
   if (!project) {
     return (
@@ -38,19 +63,19 @@ export default function ProjectPage() {
     )
   }
 
-  const handleRenameBlur = () => {
+  const handleRenameBlur = async () => {
     if (name.trim() && name.trim() !== project.name) {
-      renameProject(project.id, name.trim())
+      await renameProject(project.id, name.trim())
     } else {
       setName(project.name)
     }
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     const confirmed = window.confirm("Delete this project and all its documents?")
     if (!confirmed) return
+    await deleteProject(project.id)
     router.push("/home")
-    deleteProject(project.id)
   }
 
   return (
@@ -86,4 +111,3 @@ export default function ProjectPage() {
     </div>
   )
 }
-

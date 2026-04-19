@@ -13,7 +13,7 @@ type Props = {
   onAnnotationClick?: (annotations: TextAnnotation[]) => void
 }
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`
+pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs`
 
 export function PdfViewer({ doc, onAnnotationClick }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -140,7 +140,20 @@ export function PdfViewer({ doc, onAnnotationClick }: Props) {
 
     const render = async () => {
       try {
-        const loadingTask = pdfjsLib.getDocument(doc.pdfUrl)
+        // Handle base64 data URLs (from database storage)
+        let loadingTask;
+        if (doc.pdfUrl!.startsWith("data:")) {
+          // Extract base64 data from the data URL
+          const base64 = doc.pdfUrl!.split(",")[1]
+          const binaryString = atob(base64)
+          const bytes = new Uint8Array(binaryString.length)
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i)
+          }
+          loadingTask = pdfjsLib.getDocument({ data: bytes })
+        } else {
+          loadingTask = pdfjsLib.getDocument(doc.pdfUrl!)
+        }
         const pdf = await loadingTask.promise
 
         for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {

@@ -1,34 +1,27 @@
 "use client"
 
-import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from "react"
+import { createContext, useContext, useEffect, useMemo, useState, useCallback, ReactNode } from "react"
 import type { Project } from "@/types/project"
 import type { Document } from "@/types/document"
-import {
-  getProjects,
-  getDocumentsForProject,
-  getDocumentById,
-  createProject as mockCreateProject,
-  createDocument as mockCreateDocument,
-  createPdfDocument as mockCreatePdfDocument,
-  updateProject as mockUpdateProject,
-  updateDocument as mockUpdateDocument,
-  deleteProject as mockDeleteProject,
-  deleteDocument as mockDeleteDocument,
-} from "@/lib/mock/projects"
+import * as api from "@/lib/api/projects"
 
 type ProjectContextValue = {
   projects: Project[]
+  loading: boolean
+  error: string | null
+  refreshProjects: () => Promise<void>
   getProjectById: (id: string) => Project | undefined
   documentsForProject: (projectId: string) => Document[]
-  getDocumentById: (id: string) => Document | undefined
-  createProject: (name: string) => Project
-  renameProject: (id: string, name: string) => void
-  deleteProject: (id: string) => void
-  createDocument: (projectId: string, title: string) => Document
-  createPdfDocument: (projectId: string, title: string, pdfUrl: string, extractedText?: string) => Document
-  renameDocument: (id: string, title: string) => void
-  updateDocumentContent: (id: string, content: string) => void
-  deleteDocument: (id: string) => void
+  fetchDocuments: (projectId: string) => Promise<Document[]>
+  getDocumentById: (id: string) => Promise<Document | null>
+  createProject: (name: string) => Promise<Project>
+  renameProject: (id: string, name: string) => Promise<void>
+  deleteProject: (id: string) => Promise<void>
+  createDocument: (projectId: string, title: string) => Promise<Document>
+  createPdfDocument: (projectId: string, title: string, content: string) => Promise<Document>
+  renameDocument: (id: string, title: string) => Promise<void>
+  updateDocumentContent: (id: string, content: string) => Promise<void>
+  deleteDocument: (id: string) => Promise<void>
 }
 
 const ProjectContext = createContext<ProjectContextValue | undefined>(undefined)
@@ -40,62 +33,136 @@ export function useProjects() {
 }
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
-  // Start with no projects so server and first client render match.
-  // Then hydrate from the mock/localStorage layer on the client.
-  const [projects, setProjects] = useState<Project[] | null>(null)
-  const [version, setVersion] = useState(0)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [documentCache, setDocumentCache] = useState<Record<string, Document[]>>({})
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    setProjects(getProjects())
+  const refreshProjects = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const data = await api.getProjects()
+      setProjects(data)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  const api: ProjectContextValue = useMemo(
-    () => ({
-      projects: projects ?? [],
-      getProjectById: (id) => (projects ?? []).find((p) => p.id === id),
-      documentsForProject: (projectId) => getDocumentsForProject(projectId),
-      getDocumentById: (id) => getDocumentById(id),
-      createProject: (name) => {
-        const project = mockCreateProject(name)
-        setProjects(getProjects())
-        return project
-      },
-      renameProject: (id, name) => {
-        mockUpdateProject(id, { name })
-        setProjects(getProjects())
-      },
-      deleteProject: (id) => {
-        mockDeleteProject(id)
-        setProjects(getProjects())
-      },
-      createDocument: (projectId, title) => {
-        const doc = mockCreateDocument(projectId, title)
-        setVersion((v) => v + 1)
-        setProjects(getProjects())
-        return doc
-      },
-      createPdfDocument: (projectId, title, pdfUrl, extractedText = "") => {
-        const doc = mockCreatePdfDocument(projectId, title, pdfUrl, extractedText)
-        setVersion((v) => v + 1)
-        setProjects(getProjects())
-        return doc
-      },
-      renameDocument: (id, title) => {
-        mockUpdateDocument(id, { title })
-        setVersion((v) => v + 1)
-      },
-      updateDocumentContent: (id, content) => {
-        mockUpdateDocument(id, { content })
-        setVersion((v) => v + 1)
-      },
-      deleteDocument: (id) => {
-        mockDeleteDocument(id)
-        setVersion((v) => v + 1)
-      },
-    }),
-    [projects, version]
-  )
+  // Load projects on mount
+  useEffect(() => {
+    refreshProjects()
+  }, [refreshProjects])
 
-  return <ProjectContext.Provider value={api}>{children}</ProjectContext.Provider>
+  const contextValue: ProjectContextValue = useMemo(() => ({
+    projects,
+    loading,
+    error,
+    refreshProjects,
+
+    getProjectById: (id) => projects.find((p) => p.id === id),
+
+    documentsForProject: (projectId) => documentCache[projectId] ?? [],
+
+    fetchDocuments: async (projectId) => {
+      try {
+        const docs = await api.getDocumentsForProject(projectId)
+        setDocumentCache((prev) => ({ ...prev, [projectId]: docs }))
+        return docs
+      } catch (err: any) {
+        setError(err.message)
+        return []
+      }
+    },
+
+    getDocumentById: async (id) => {
+      // Check cache first
+      for (const docs of Object.values(documentCache)) {
+        const found = docs.find((d) => d.id === id)
+        if (found) return found
+      }
+      // Fetch from API
+      try {
+        return await api.getDocumentById(id)
+      } catch {
+        return null
+      }
+    },
+
+    createProject: async (name) => {
+      const project = await api.createProject(name)
+      setProjects((prev) => [project, ...prev])
+      return project
+    },
+
+    renameProject: async (id, name) => {
+      const updated = await api.updateProject(id, name)
+      setProjects((prev) => prev.map((p) => (p.id === id ? updated : p)))
+    },
+
+    deleteProject: async (id) => {
+      await api.deleteProject(id)
+      setProjects((prev) => prev.filter((p) => p.id !== id))
+      setDocumentCache((prev) => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+    },
+
+    createDocument: async (projectId, title) => {
+      const doc = await api.createDocument(projectId, title, "text")
+      setDocumentCache((prev) => ({
+        ...prev,
+        [projectId]: [...(prev[projectId] ?? []), doc],
+      }))
+      return doc
+    },
+
+    createPdfDocument: async (projectId, title, content) => {
+      const doc = await api.createDocument(projectId, title, "pdf", content)
+      setDocumentCache((prev) => ({
+        ...prev,
+        [projectId]: [...(prev[projectId] ?? []), doc],
+      }))
+      return doc
+    },
+
+    renameDocument: async (id, title) => {
+      const updated = await api.updateDocument(id, { title })
+      setDocumentCache((prev) => {
+        const next = { ...prev }
+        for (const projectId of Object.keys(next)) {
+          next[projectId] = next[projectId].map((d) => (d.id === id ? updated : d))
+        }
+        return next
+      })
+    },
+
+    updateDocumentContent: async (id, content) => {
+      const updated = await api.updateDocument(id, { content })
+      setDocumentCache((prev) => {
+        const next = { ...prev }
+        for (const projectId of Object.keys(next)) {
+          next[projectId] = next[projectId].map((d) => (d.id === id ? updated : d))
+        }
+        return next
+      })
+    },
+
+    deleteDocument: async (id) => {
+      await api.deleteDocument(id)
+      setDocumentCache((prev) => {
+        const next = { ...prev }
+        for (const projectId of Object.keys(next)) {
+          next[projectId] = next[projectId].filter((d) => d.id !== id)
+        }
+        return next
+      })
+    },
+  }), [projects, documentCache, loading, error, refreshProjects])
+
+  return <ProjectContext.Provider value={contextValue}>{children}</ProjectContext.Provider>
 }
-

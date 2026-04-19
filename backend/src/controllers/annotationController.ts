@@ -17,6 +17,12 @@ export const getAnnotationsByDoc = async (req: Request, res: Response) => {
 export const createAnnotation = async (req: Request, res: Response) => {
   try {
     const { docId, labelId, content, startOffset, endOffset } = req.body;
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
     const newAnnotation = await prisma.annotation.create({
       data: {
         docId,
@@ -24,6 +30,7 @@ export const createAnnotation = async (req: Request, res: Response) => {
         content: content || '',
         startOffset,
         endOffset,
+        userId,
       },
     });
     res.status(201).json(newAnnotation);
