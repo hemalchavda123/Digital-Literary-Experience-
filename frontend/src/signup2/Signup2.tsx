@@ -151,7 +151,7 @@ export default function Signup2(): JSX.Element {
                     <h3 style={{ margin: 0, fontSize: 22, color: "#000" }}>
                       Create account
                     </h3>
-                    <p style={{ margin: "6px 0 18px", color: "#666" }}>
+                    <p style={{ margin: "6px 0 18px", color: "#111827" }}>
                       Join us — it only takes a minute.
                     </p>
 
@@ -188,7 +188,7 @@ export default function Signup2(): JSX.Element {
                     <h3 style={{ margin: 0, fontSize: 22, color: "#000" }}>
                       Welcome back
                     </h3>
-                    <p style={{ margin: "6px 0 18px", color: "#666" }}>
+                    <p style={{ margin: "6px 0 18px", color: "#111827" }}>
                       Sign in to continue
                     </p>
 
@@ -237,7 +237,7 @@ export default function Signup2(): JSX.Element {
                     <h3 style={{ margin: 0, fontSize: 22, color: "#000" }}>
                       Reset password
                     </h3>
-                    <p style={{ margin: "6px 0 18px", color: "#666" }}>
+                    <p style={{ margin: "6px 0 18px", color: "#111827" }}>
                       We’ll send a link to your email.
                     </p>
 
@@ -279,7 +279,7 @@ export default function Signup2(): JSX.Element {
                     <h3 style={{ margin: 0, fontSize: 22 }}>
                       All set
                     </h3>
-                    <p style={{ marginTop: 10, color: "#666" }}>
+                    <p style={{ marginTop: 10, color: "#111827" }}>
                       Redirecting to the app…
                     </p>
                   </div>

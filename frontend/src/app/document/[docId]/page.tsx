@@ -1,16 +1,33 @@
 "use client"
 
 import { useParams, useRouter } from "next/navigation"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useProjects } from "@/context/ProjectContext"
-import { PdfViewer } from "@/components/pdf/PdfViewer"
+import { useAnnotations } from "@/context/AnnotationContext"
+import { AnnotatableText } from "@/components/document/AnnotatableText"
+import { AnnotationSidebar } from "@/components/document/AnnotationSidebar"
+import { LabelManagerModal } from "@/components/document/LabelManagerModal"
+import { TextAnnotation } from "@/types/annotation"
+import dynamic from "next/dynamic"
+
+const PdfViewer = dynamic(() => import("@/components/pdf/PdfViewer").then(mod => mod.PdfViewer), { ssr: false })
 
 export default function DocumentPage() {
   const params = useParams<{ docId: string }>()
   const router = useRouter()
   const { getDocumentById, renameDocument, deleteDocument } = useProjects()
+  const { fetchLabels, fetchAnnotations } = useAnnotations()
   const doc = getDocumentById(params.docId)
   const [title, setTitle] = useState(doc?.title ?? "")
+  const [showLabelManager, setShowLabelManager] = useState(false)
+  const [selectedAnnotations, setSelectedAnnotations] = useState<TextAnnotation[]>([])
+
+  useEffect(() => {
+    if (doc) {
+      fetchLabels(doc.projectId)
+      fetchAnnotations(doc.id)
+    }
+  }, [doc, fetchLabels, fetchAnnotations])
 
   if (!doc) {
     return (
@@ -19,14 +36,14 @@ export default function DocumentPage() {
           <button
             type="button"
             onClick={() => router.push("/home")}
-            className="text-gray-500 hover:text-gray-800 mr-3"
+            className="text-gray-900 hover:text-black mr-3"
           >
             ← Back
           </button>
           <span className="font-medium text-gray-700">Document not found</span>
         </header>
         <main className="flex-1 flex items-center justify-center">
-          <p className="text-sm text-gray-500">The document you&apos;re looking for doesn&apos;t exist.</p>
+          <p className="text-sm text-gray-900">The document you&apos;re looking for doesn&apos;t exist.</p>
         </main>
       </div>
     )
@@ -43,8 +60,9 @@ export default function DocumentPage() {
   const handleDelete = () => {
     const confirmed = window.confirm("Delete this document?")
     if (!confirmed) return
+    const projectId = doc.projectId
+    router.push(`/project/${projectId}`)
     deleteDocument(doc.id)
-    router.push(`/project/${doc.projectId}`)
   }
 
   return (
@@ -55,7 +73,7 @@ export default function DocumentPage() {
           <button
             type="button"
             onClick={() => router.push(`/project/${doc.projectId}`)}
-            className="text-gray-500 hover:text-gray-800"
+            className="text-gray-900 hover:text-black"
           >
             ←
           </button>
@@ -67,10 +85,16 @@ export default function DocumentPage() {
             className="min-w-0 flex-1 border-none bg-transparent text-sm font-medium text-gray-900 focus:outline-none"
           />
         </div>
-        <div className="flex items-center gap-3 text-xs text-gray-500">
-          {/* Reserved area for future: annotations, labels, chat, permissions */}
+        <div className="flex items-center gap-3 text-xs text-gray-900">
+          <button
+            type="button"
+            onClick={() => setShowLabelManager(true)}
+            className="rounded border border-gray-300 px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Manage Labels
+          </button>
           <span className="hidden sm:inline">
-            Annotations · Labels · Chat · Permissions (coming soon)
+            Chat · Permissions (coming soon)
           </span>
           <button
             type="button"
@@ -83,27 +107,52 @@ export default function DocumentPage() {
       </header>
 
       {/* Google Docs–style: light gray canvas with centered white page */}
-      <main className="flex-1 w-full flex bg-gray-100">
-        {doc.kind === "pdf" ? (
-          // Scrollable PDF viewer with centered white "page"
-          <div className="flex-1 flex justify-center overflow-auto py-8">
-            <div className="w-full max-w-5xl px-4">
-              <div className="bg-white shadow-md rounded-sm overflow-hidden min-h-[80vh]">
-                <PdfViewer doc={doc} />
+      <main className="flex-1 w-full flex bg-gray-100 overflow-hidden">
+        <div className="flex-1 flex overflow-y-auto">
+          {doc.kind === "pdf" ? (
+            // Scrollable PDF viewer with centered white "page"
+            <div className="flex-1 flex justify-center py-8">
+              <div className="w-full max-w-5xl px-4">
+                <div className="bg-white shadow-md rounded-sm overflow-hidden min-h-[80vh]">
+                  <PdfViewer 
+                    doc={doc} 
+                    onAnnotationClick={(anns) => setSelectedAnnotations(anns)}
+                  />
+                </div>
               </div>
             </div>
-          </div>
-        ) : (
-          // Read-only text viewer variant
-          <div className="flex-1 flex justify-center overflow-auto py-8">
-            <div className="w-full max-w-3xl px-4">
-              <article className="bg-white shadow-md rounded-sm px-6 py-6 text-sm leading-relaxed whitespace-pre-wrap">
-                {doc.content || "This document is currently empty."}
-              </article>
+          ) : (
+            // Read-only text viewer variant with annotations
+            <div className="flex-1 flex justify-center py-8">
+              <div className="w-full max-w-3xl px-4">
+                <article className="bg-white shadow-md rounded-sm px-6 py-6 text-sm leading-relaxed whitespace-pre-wrap text-gray-900 min-h-[80vh]">
+                  {doc.content ? (
+                    <AnnotatableText
+                      text={doc.content}
+                      docId={doc.id}
+                      onAnnotationClick={(anns) => setSelectedAnnotations(anns)}
+                    />
+                  ) : (
+                    "This document is currently empty."
+                  )}
+                </article>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
+        
+        <AnnotationSidebar
+          selectedAnnotations={selectedAnnotations}
+          onClose={() => setSelectedAnnotations([])}
+        />
       </main>
+
+      {showLabelManager && (
+        <LabelManagerModal
+          projectId={doc.projectId}
+          onClose={() => setShowLabelManager(false)}
+        />
+      )}
     </div>
   )
 }

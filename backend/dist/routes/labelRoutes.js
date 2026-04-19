@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const labelController_1 = require("../controllers/labelController");
+const authMiddleware_1 = require("../middleware/authMiddleware");
+const router = (0, express_1.Router)();
+router.use(authMiddleware_1.authMiddleware);
+router.get('/project/:projectId', labelController_1.getLabelsByProject);
+router.post('/', labelController_1.createLabel);
+router.put('/:id', labelController_1.updateLabel);
+router.delete('/:id', labelController_1.deleteLabel);
+exports.default = router;

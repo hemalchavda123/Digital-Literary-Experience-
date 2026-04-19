@@ -76,7 +76,7 @@ export default function HomePage() {
       {/* New dashboard area below original design */}
       <main className="w-full">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <p className="text-center" style={{ color: "#6b7280" }}>
+          <p className="text-center" style={{ color: "#111827" }}>
             Start a new project, explore collections, or continue where you left off.
           </p>
 

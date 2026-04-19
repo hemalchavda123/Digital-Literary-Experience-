@@ -43,7 +43,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   // Start with no projects so server and first client render match.
   // Then hydrate from the mock/localStorage layer on the client.
   const [projects, setProjects] = useState<Project[] | null>(null)
-  const [, setVersion] = useState(0)
+  const [version, setVersion] = useState(0)
 
   useEffect(() => {
     setProjects(getProjects())
@@ -93,7 +93,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         setVersion((v) => v + 1)
       },
     }),
-    [projects]
+    [projects, version]
   )
 
   return <ProjectContext.Provider value={api}>{children}</ProjectContext.Provider>

@@ -37,7 +37,7 @@ export default async function ForgotPassword({
                     Reset Password
                 </h1>
 
-                <p className="text-center text-sm mb-4 sm:mb-6" style={{ color: '#6b7280' }}>
+                <p className="text-center text-sm mb-4 sm:mb-6" style={{ color: '#111827' }}>
                     Enter your email address and we'll send you a link to reset your password.
                 </p>
 

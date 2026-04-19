@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { ProjectProvider } from '@/context/ProjectContext'
+import { AnnotationProvider } from '@/context/AnnotationContext'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -19,9 +20,11 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ProjectProvider>
-          <main className="min-h-screen flex flex-col items-center">
-            {children}
-          </main>
+          <AnnotationProvider>
+            <main className="min-h-screen flex flex-col items-center">
+              {children}
+            </main>
+          </AnnotationProvider>
         </ProjectProvider>
       </body>
     </html>

@@ -8,7 +8,7 @@ type Props = {
 export function ProjectGrid({ projects }: Props) {
   if (!projects.length) {
     return (
-      <div className="mt-8 text-sm text-gray-500">
+      <div className="mt-8 text-sm text-gray-900">
         No projects yet. Create your first project to get started.
       </div>
     )

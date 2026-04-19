@@ -23,7 +23,7 @@ export default function ProjectPage() {
         <Navbar />
         <main className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <p className="text-sm text-gray-500 mb-4">Project not found.</p>
+            <p className="text-sm text-gray-900 mb-4">Project not found.</p>
             <button
               type="button"
               onClick={() => router.push("/home")}
@@ -49,8 +49,8 @@ export default function ProjectPage() {
   const handleDelete = () => {
     const confirmed = window.confirm("Delete this project and all its documents?")
     if (!confirmed) return
-    deleteProject(project.id)
     router.push("/home")
+    deleteProject(project.id)
   }
 
   return (
@@ -64,7 +64,7 @@ export default function ProjectPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               onBlur={handleRenameBlur}
-              className="flex-1 border-none bg-transparent text-2xl font-semibold focus:outline-none"
+              className="flex-1 border-none bg-transparent text-2xl font-semibold text-gray-900 placeholder-gray-500 focus:outline-none"
             />
             <button
               type="button"
