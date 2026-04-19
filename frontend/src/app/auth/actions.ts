@@ -16,7 +16,7 @@ export async function login(formData: FormData) {
     })
 
     if (error) {
-        return redirect(`/login?message=${encodeURIComponent(error.message)}`)
+        return redirect(`/signup2?message=${encodeURIComponent(error.message)}`)
     }
 
     revalidatePath('/', 'layout')
@@ -41,12 +41,12 @@ export async function signup(formData: FormData) {
     })
 
     if (error) {
-        return redirect(`/signup?message=${encodeURIComponent(error.message)}`)
+        return redirect(`/signup2?message=${encodeURIComponent(error.message)}`)
     }
 
     revalidatePath('/', 'layout')
 
-    return redirect(`/login?message=Check your email to confirm your account.`)
+    return redirect(`/signup2?message=Check your email to confirm your account.`)
 }
 
 export async function forgotPassword(formData: FormData) {
@@ -74,5 +74,5 @@ export async function logout() {
     const supabase = await createClient()
     await supabase.auth.signOut()
     revalidatePath('/', 'layout')
-    redirect('/login')
+    redirect('/signup2')
 }

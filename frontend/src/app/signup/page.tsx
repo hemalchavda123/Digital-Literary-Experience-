@@ -94,7 +94,7 @@ export default async function Signup({
 
                 <div className="text-center text-xs sm:text-sm mt-3 sm:mt-4">
                     Already have an account?{' '}
-                    <Link href="/login" className="hover:underline" style={{ color: '#a855f7' }}>
+                    <Link href="/signup2" className="hover:underline" style={{ color: '#a855f7' }}>
                         Sign In
                     </Link>
                 </div>

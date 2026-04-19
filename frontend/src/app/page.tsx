@@ -12,5 +12,5 @@ export default async function Page() {
     redirect('/home')
   }
 
-  redirect('/login')
+  redirect('/signup2')
 }
