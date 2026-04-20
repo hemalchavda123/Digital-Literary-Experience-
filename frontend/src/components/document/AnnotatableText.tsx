@@ -130,14 +130,18 @@ export function AnnotatableText({ text, docId, onAnnotationClick }: Props) {
 
   const handleAddAnnotation = async (labelId: string) => {
     if (contextMenu) {
-      await addAnnotation(docId, labelId, contextMenu.start, contextMenu.end, "")
+      const { start, end } = contextMenu
       setContextMenu(null)
       window.getSelection()?.removeAllRanges()
+      await addAnnotation(docId, labelId, start, end, "")
     }
   }
 
   useEffect(() => {
-    const closeMenu = () => setContextMenu(null)
+    const closeMenu = (e: MouseEvent) => {
+      if (e.shiftKey) return
+      setContextMenu(null)
+    }
     window.addEventListener("click", closeMenu)
     return () => window.removeEventListener("click", closeMenu)
   }, [])

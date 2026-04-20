@@ -11,6 +11,7 @@ import "pdfjs-dist/web/pdf_viewer.css"
 type Props = {
   doc: AppDocument
   onAnnotationClick?: (annotations: TextAnnotation[]) => void
+  onTextContentChange?: (text: string) => void
 }
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs`
@@ -59,7 +60,7 @@ function buildStripedBackground(colors: string[]) {
   return { backgroundImage: `linear-gradient(90deg, ${stops})` }
 }
 
-export function PdfViewer({ doc, onAnnotationClick }: Props) {
+export function PdfViewer({ doc, onAnnotationClick, onTextContentChange }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isRendered, setIsRendered] = useState(false)
@@ -91,14 +92,18 @@ export function PdfViewer({ doc, onAnnotationClick }: Props) {
 
   const handleAddAnnotation = async (labelId: string) => {
     if (contextMenu) {
-      await addAnnotation(doc.id, labelId, contextMenu.start, contextMenu.end, "")
+      const { start, end } = contextMenu
       setContextMenu(null)
       window.getSelection()?.removeAllRanges()
+      await addAnnotation(doc.id, labelId, start, end, "")
     }
   }
 
   useEffect(() => {
-    const closeMenu = () => setContextMenu(null)
+    const closeMenu = (e: MouseEvent) => {
+      if (e.shiftKey) return
+      setContextMenu(null)
+    }
     window.addEventListener("click", closeMenu)
     return () => window.removeEventListener("click", closeMenu)
   }, [])
@@ -169,21 +174,7 @@ export function PdfViewer({ doc, onAnnotationClick }: Props) {
       }
     })
 
-    // Merge overlapping boxes so clicking an overlap selects all annotations.
-    const merged: HighlightBox[] = []
-    for (const box of raw) {
-      let didMerge = false
-      for (let i = 0; i < merged.length; i++) {
-        if (rectsOverlap(merged[i], box)) {
-          merged[i] = mergeBoxes(merged[i], box)
-          didMerge = true
-          break
-        }
-      }
-      if (!didMerge) merged.push(box)
-    }
-
-    setHighlights(merged)
+    setHighlights(raw)
   }, [annotations, isRendered, labels])
 
   useEffect(() => {
@@ -263,10 +254,14 @@ export function PdfViewer({ doc, onAnnotationClick }: Props) {
         }
         if (!cancelled) {
           setIsRendered(true)
+          // Extract text from DOM after rendering to match annotation offsets
+          if (onTextContentChange && container.textContent) {
+            onTextContentChange(container.textContent)
+          }
         }
       } catch (e: any) {
         if (!cancelled) {
-          if (doc.pdfUrl.startsWith('blob:')) {
+          if (doc.pdfUrl && doc.pdfUrl.startsWith('blob:')) {
             setError("This mock PDF is no longer available in memory after a page reload. Please upload it again or create a new document.")
           } else {
             setError("Failed to render PDF.")
@@ -293,10 +288,32 @@ export function PdfViewer({ doc, onAnnotationClick }: Props) {
     return <p className="text-sm text-red-500 mt-4">{error}</p>
   }
 
+  const handleContainerMouseDown = (e: React.MouseEvent) => {
+    if (!e.shiftKey || !onAnnotationClick || !containerRef.current) return
+    
+    const containerRect = containerRef.current.getBoundingClientRect()
+    const scrollContainer = containerRef.current.closest('.overflow-auto') as HTMLElement
+    const scrollTop = scrollContainer ? scrollContainer.scrollTop : 0
+    const scrollLeft = scrollContainer ? scrollContainer.scrollLeft : 0
+    
+    const x = e.clientX - containerRect.left + scrollLeft
+    const y = e.clientY - containerRect.top + scrollTop
+    
+    for (const h of highlights) {
+      if (x >= h.left && x <= h.left + h.width && y >= h.top && y <= h.top + h.height) {
+        e.stopPropagation()
+        const clickedAnns = annotations.filter(a => h.annotationIds.includes(a.id))
+        onAnnotationClick(clickedAnns)
+        break
+      }
+    }
+  }
+
   return (
     <div 
       className="w-full h-full overflow-auto bg-gray-100 px-6 py-8"
       onContextMenu={handleContextMenu}
+      onMouseDown={handleContainerMouseDown}
     >
       <div className="relative mx-auto w-max">
         <div ref={containerRef} />
@@ -305,7 +322,7 @@ export function PdfViewer({ doc, onAnnotationClick }: Props) {
         {isRendered && highlights.map((h, i) => (
           <div
             key={i}
-            className="absolute cursor-pointer transition-colors hover:brightness-95 mix-blend-multiply opacity-50"
+            className="absolute transition-colors hover:brightness-95 mix-blend-multiply opacity-50"
             style={{
               top: h.top,
               left: h.left,
@@ -317,14 +334,8 @@ export function PdfViewer({ doc, onAnnotationClick }: Props) {
                   .map((a) => labels.find((l) => l.id === a?.labelId)?.color)
                   .filter((c): c is string => !!c)
               )),
-              zIndex: 10
-            }}
-            onClick={(e) => {
-              e.stopPropagation()
-              if (!e.shiftKey) return
-              if (!onAnnotationClick) return
-              const clickedAnns = annotations.filter(a => h.annotationIds.includes(a.id))
-              onAnnotationClick(clickedAnns)
+              zIndex: 10,
+              pointerEvents: 'none'
             }}
           />
         ))}

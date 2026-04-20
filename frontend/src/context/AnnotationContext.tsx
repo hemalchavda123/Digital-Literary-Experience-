@@ -196,10 +196,28 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
   }
 
   const addAnnotation = async (docId: string, labelId: string, startOffset: number, endOffset: number, content = "") => {
+    // Optimistically add annotation with temporary ID
+    const tempId = `temp-${Date.now()}`
+    const tempAnn: TextAnnotation = {
+      id: tempId,
+      docId,
+      labelId,
+      startOffset,
+      endOffset,
+      content,
+      userId: "", // Will be filled by server
+      user: undefined,
+      comments: []
+    }
+    setAnnotations((prev) => [...prev, tempAnn])
+
     try {
       const newAnn = await api.createAnnotation(docId, labelId, startOffset, endOffset, content)
-      setAnnotations((prev) => [...prev, newAnn])
+      // Replace temp annotation with real one from server
+      setAnnotations((prev) => prev.map((a) => a.id === tempId ? newAnn : a))
     } catch (err: unknown) {
+      // Remove temp annotation on error
+      setAnnotations((prev) => prev.filter((a) => a.id !== tempId))
       setError(err instanceof Error ? err.message : "Failed to create annotation")
       throw err
     }

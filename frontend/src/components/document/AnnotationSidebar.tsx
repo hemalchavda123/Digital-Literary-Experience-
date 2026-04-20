@@ -8,9 +8,10 @@ import { Trash2, Edit2, Check, X, Send, MessageSquareText } from "lucide-react"
 type Props = {
   selectedAnnotations: TextAnnotation[]
   onClose: () => void
+  documentText?: string
 }
 
-export function AnnotationSidebar({ selectedAnnotations, onClose }: Props) {
+export function AnnotationSidebar({ selectedAnnotations, onClose, documentText }: Props) {
   const { labels, annotations, editAnnotation, removeAnnotation, addComment, removeComment } = useAnnotations()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editContent, setEditContent] = useState("")
@@ -93,6 +94,15 @@ export function AnnotationSidebar({ selectedAnnotations, onClose }: Props) {
 
           return (
             <div key={ann.id} className="border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden">
+              {/* Highlighted text preview */}
+              {documentText && (
+                <div className="px-3 py-2 bg-gray-100 border-b border-gray-200">
+                  <div className="text-[11px] text-gray-500 mb-1">Highlighted text:</div>
+                  <div className="text-sm text-gray-900 italic leading-relaxed">
+                    "{documentText.slice(ann.startOffset, ann.endOffset)}"
+                  </div>
+                </div>
+              )}
               {/* Main annotation (like a post) */}
               <div className="p-3 bg-gray-50/60">
                 <div className="flex items-start justify-between gap-2">

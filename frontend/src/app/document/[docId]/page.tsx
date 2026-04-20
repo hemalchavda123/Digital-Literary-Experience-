@@ -23,6 +23,7 @@ export default function DocumentPage() {
   const [title, setTitle] = useState("")
   const [showLabelManager, setShowLabelManager] = useState(false)
   const [selectedAnnotations, setSelectedAnnotations] = useState<TextAnnotation[]>([])
+  const [pdfTextContent, setPdfTextContent] = useState<string | null>(null)
 
   // Fetch document from backend on mount
   useEffect(() => {
@@ -154,6 +155,7 @@ export default function DocumentPage() {
                 <div className="bg-white shadow-md rounded-sm overflow-hidden min-h-[80vh]">
                   <PdfViewer 
                     doc={{ ...doc, pdfUrl: pdfSource }}
+                    onTextContentChange={setPdfTextContent}
                     onAnnotationClick={(anns) => setSelectedAnnotations(anns)}
                   />
                 </div>
@@ -183,6 +185,7 @@ export default function DocumentPage() {
         <AnnotationSidebar
           selectedAnnotations={selectedAnnotations}
           onClose={() => setSelectedAnnotations([])}
+          documentText={doc.kind === "pdf" ? pdfTextContent ?? undefined : doc.content}
         />
       </main>
 
