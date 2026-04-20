@@ -20,7 +20,7 @@ class JWTService {
      */
     generateAccessToken(payload) {
         return jsonwebtoken_1.default.sign(payload, this.accessSecret, {
-            expiresIn: '15m',
+            expiresIn: '1h',
             algorithm: 'HS256'
         });
     }

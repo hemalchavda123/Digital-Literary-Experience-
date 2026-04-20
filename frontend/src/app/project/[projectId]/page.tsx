@@ -6,7 +6,9 @@ import Footer from "@/components/Footer"
 import { useProjects } from "@/context/ProjectContext"
 import { DocumentList } from "@/components/project/DocumentList"
 import { CreateDocumentButton } from "@/components/project/CreateDocumentButton"
+import { ShareModal } from "@/components/project/ShareModal"
 import { useState, useEffect } from "react"
+import { getCurrentUser } from "@/lib/api/authFetch"
 
 export default function ProjectPage() {
   const params = useParams<{ projectId: string }>()
@@ -17,6 +19,12 @@ export default function ProjectPage() {
   const docs = documentsForProject(projectId)
   const [name, setName] = useState(project?.name ?? "")
   const [docsLoaded, setDocsLoaded] = useState(false)
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false)
+  const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null)
+
+  useEffect(() => {
+    getCurrentUser().then(user => setCurrentUser(user))
+  }, [])
 
   // Fetch documents when the project page loads
   useEffect(() => {
@@ -91,13 +99,26 @@ export default function ProjectPage() {
               onBlur={handleRenameBlur}
               className="flex-1 border-none bg-transparent text-2xl font-semibold text-gray-900 placeholder-gray-500 focus:outline-none"
             />
-            <button
-              type="button"
-              onClick={handleDelete}
-              className="rounded-md border border-red-300 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
-            >
-              Delete project
-            </button>
+            <div className="flex gap-2">
+              {currentUser?.id === project.ownerId && (
+                <button
+                  type="button"
+                  onClick={() => setIsShareModalOpen(true)}
+                  className="rounded-md bg-black px-3 py-2 text-xs font-medium text-white hover:bg-gray-800"
+                >
+                  Share
+                </button>
+              )}
+              {currentUser?.id === project.ownerId && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  className="rounded-md border border-red-300 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
+                >
+                  Delete project
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -108,6 +129,11 @@ export default function ProjectPage() {
         </div>
       </main>
       <Footer />
+      <ShareModal 
+        isOpen={isShareModalOpen} 
+        onClose={() => setIsShareModalOpen(false)} 
+        projectId={project.id} 
+      />
     </div>
   )
 }

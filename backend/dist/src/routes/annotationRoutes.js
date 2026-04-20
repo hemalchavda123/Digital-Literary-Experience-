@@ -9,4 +9,5 @@ router.get('/doc/:docId', annotationController_1.getAnnotationsByDoc);
 router.post('/', annotationController_1.createAnnotation);
 router.put('/:id', annotationController_1.updateAnnotation);
 router.delete('/:id', annotationController_1.deleteAnnotation);
+router.post('/:id/comments', annotationController_1.createComment);
 exports.default = router;

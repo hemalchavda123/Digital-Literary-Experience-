@@ -15,8 +15,8 @@ export default function Navbar() {
     const defaultImage = "https://via.placeholder.com/150"
 
     useEffect(() => {
-        function handleClickOutside(e) {
-            if (profileRef.current && !profileRef.current.contains(e.target)) {
+        function handleClickOutside(e: MouseEvent) {
+            if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
                 setProfileOpen(false)
             }
         }

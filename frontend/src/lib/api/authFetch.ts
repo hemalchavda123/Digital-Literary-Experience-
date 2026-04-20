@@ -99,3 +99,16 @@ export async function authFetch(input: RequestInfo | URL, init?: RequestInit): P
 
   return res;
 }
+
+/**
+ * Fetch the current authenticated user.
+ */
+export async function getCurrentUser(): Promise<{ id: string; username: string; email: string } | null> {
+  try {
+    const res = await authFetch(`${API_BASE}/auth/me`);
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}

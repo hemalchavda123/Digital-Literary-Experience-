@@ -15,9 +15,15 @@ export const getDocumentsByProject = async (req: Request, res: Response): Promis
 
     const projectId = req.params.projectId as string;
 
-    // Verify the user owns the project
+    // Verify the user is owner or member
     const project = await prisma.project.findFirst({
-      where: { id: projectId, ownerId: userId },
+      where: {
+        id: projectId,
+        OR: [
+          { ownerId: userId },
+          { members: { some: { userId } } }
+        ]
+      },
     });
 
     if (!project) {
@@ -60,9 +66,15 @@ export const getDocumentById = async (req: Request, res: Response): Promise<void
       return;
     }
 
-    // Verify ownership through the project
+    // Verify access through the project
     const project = await prisma.project.findFirst({
-      where: { id: document.projectId, ownerId: userId },
+      where: {
+        id: document.projectId,
+        OR: [
+          { ownerId: userId },
+          { members: { some: { userId } } }
+        ]
+      },
     });
 
     if (!project) {
@@ -97,9 +109,15 @@ export const createDocument = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    // Verify project ownership
+    // Verify project access (Owner or Editor)
     const project = await prisma.project.findFirst({
-      where: { id: projectId, ownerId: userId },
+      where: {
+        id: projectId,
+        OR: [
+          { ownerId: userId },
+          { members: { some: { userId, role: 'EDITOR' } } }
+        ]
+      },
     });
 
     if (!project) {
@@ -156,7 +174,13 @@ export const updateDocument = async (req: Request, res: Response): Promise<void>
     }
 
     const project = await prisma.project.findFirst({
-      where: { id: existing.projectId, ownerId: userId },
+      where: {
+        id: existing.projectId,
+        OR: [
+          { ownerId: userId },
+          { members: { some: { userId, role: 'EDITOR' } } }
+        ]
+      },
     });
 
     if (!project) {
@@ -211,7 +235,13 @@ export const deleteDocument = async (req: Request, res: Response): Promise<void>
     }
 
     const project = await prisma.project.findFirst({
-      where: { id: existing.projectId, ownerId: userId },
+      where: {
+        id: existing.projectId,
+        OR: [
+          { ownerId: userId },
+          { members: { some: { userId, role: 'EDITOR' } } }
+        ]
+      },
     });
 
     if (!project) {

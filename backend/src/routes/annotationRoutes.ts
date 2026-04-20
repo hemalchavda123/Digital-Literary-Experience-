@@ -4,6 +4,7 @@ import {
   createAnnotation,
   updateAnnotation,
   deleteAnnotation,
+  createComment,
 } from '../controllers/annotationController';
 import { authMiddleware } from '../middleware/authMiddleware';
 
@@ -15,5 +16,6 @@ router.get('/doc/:docId', getAnnotationsByDoc);
 router.post('/', createAnnotation);
 router.put('/:id', updateAnnotation);
 router.delete('/:id', deleteAnnotation);
+router.post('/:id/comments', createComment);
 
 export default router;

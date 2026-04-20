@@ -4,6 +4,27 @@ import prisma from '../config/db';
 export const getLabelsByProject = async (req: Request, res: Response) => {
   try {
     const projectId = req.params.projectId as string;
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Verify ownership or membership
+    const project = await prisma.project.findFirst({
+      where: {
+        id: projectId,
+        OR: [
+          { ownerId: userId },
+          { members: { some: { userId } } }
+        ]
+      },
+    });
+
+    if (!project) {
+      return res.status(403).json({ error: 'Unauthorized to view labels for this project' });
+    }
+
     const labels = await prisma.label.findMany({
       where: { projectId },
       orderBy: { createdAt: 'asc' },
@@ -21,6 +42,15 @@ export const createLabel = async (req: Request, res: Response) => {
 
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Only OWNER can create labels
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, ownerId: userId },
+    });
+
+    if (!project) {
+      return res.status(403).json({ error: 'Only the project owner can create labels' });
     }
 
     const newLabel = await prisma.label.create({
@@ -42,6 +72,25 @@ export const updateLabel = async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const { name, color } = req.body;
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const existing = await prisma.label.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Label not found' });
+    }
+
+    // Only OWNER can update labels
+    const project = await prisma.project.findFirst({
+      where: { id: existing.projectId, ownerId: userId },
+    });
+
+    if (!project) {
+      return res.status(403).json({ error: 'Only the project owner can update labels' });
+    }
 
     const data: any = {};
     if (name !== undefined) data.name = name;
@@ -63,6 +112,26 @@ export const updateLabel = async (req: Request, res: Response) => {
 export const deleteLabel = async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const existing = await prisma.label.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Label not found' });
+    }
+
+    // Only OWNER can delete labels
+    const project = await prisma.project.findFirst({
+      where: { id: existing.projectId, ownerId: userId },
+    });
+
+    if (!project) {
+      return res.status(403).json({ error: 'Only the project owner can delete labels' });
+    }
+
     await prisma.label.delete({ where: { id } });
     res.json({ message: 'Label deleted successfully' });
   } catch (error: any) {

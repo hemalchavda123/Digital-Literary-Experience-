@@ -70,3 +70,15 @@ export async function deleteAnnotation(id: string): Promise<void> {
   const res = await authFetch(`${API_BASE_URL}/annotations/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Failed to delete annotation");
 }
+
+// --- Comments ---
+
+export async function createAnnotationComment(annotationId: string, content: string) {
+  const res = await authFetch(`${API_BASE_URL}/annotations/${annotationId}/comments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) throw new Error("Failed to create comment");
+  return res.json();
+}

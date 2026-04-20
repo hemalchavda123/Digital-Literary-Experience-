@@ -17,6 +17,7 @@ type AnnotationContextValue = {
   addAnnotation: (docId: string, labelId: string, startOffset: number, endOffset: number, content?: string) => Promise<void>
   editAnnotation: (id: string, content: string, labelId?: string) => Promise<void>
   removeAnnotation: (id: string) => Promise<void>
+  addComment: (annotationId: string, content: string) => Promise<void>
 }
 
 const AnnotationContext = createContext<AnnotationContextValue | undefined>(undefined)
@@ -111,6 +112,21 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const addComment = async (annotationId: string, content: string) => {
+    try {
+      const newComment = await api.createAnnotationComment(annotationId, content)
+      setAnnotations((prev) => prev.map((a) => {
+        if (a.id === annotationId) {
+          return { ...a, comments: [...(a.comments || []), newComment] }
+        }
+        return a
+      }))
+    } catch (err: any) {
+      setError(err.message)
+      throw err
+    }
+  }
+
   return (
     <AnnotationContext.Provider
       value={{
@@ -126,6 +142,7 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
         addAnnotation,
         editAnnotation,
         removeAnnotation,
+        addComment,
       }}
     >
       {children}

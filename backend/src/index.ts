@@ -6,6 +6,7 @@ import labelRoutes from './routes/labelRoutes';
 import authRoutes from './routes/authRoutes';
 import projectRoutes from './routes/projectRoutes';
 import documentRoutes from './routes/documentRoutes';
+import projectMemberRoutes from './routes/projectMemberRoutes';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -19,6 +20,7 @@ app.use('/api/annotations', annotationRoutes);
 app.use('/api/labels', labelRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/projects', projectMemberRoutes); // Uses mergeParams inside or just same base path
 app.use('/api/documents', documentRoutes);
 
 // Error handling middleware (must be last)
@@ -28,3 +30,6 @@ app.use(errorHandler);
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+
+// Trigger restart
+

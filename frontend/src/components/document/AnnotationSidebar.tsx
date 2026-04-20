@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { TextAnnotation } from "@/types/annotation"
 import { useAnnotations } from "@/context/AnnotationContext"
-import { Trash2, Edit2, Check, X } from "lucide-react"
+import { Trash2, Edit2, Check, X, Send } from "lucide-react"
 
 type Props = {
   selectedAnnotations: TextAnnotation[]
@@ -11,9 +11,10 @@ type Props = {
 }
 
 export function AnnotationSidebar({ selectedAnnotations, onClose }: Props) {
-  const { labels, editAnnotation, removeAnnotation } = useAnnotations()
+  const { labels, editAnnotation, removeAnnotation, addComment } = useAnnotations()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editContent, setEditContent] = useState("")
+  const [commentInputs, setCommentInputs] = useState<Record<string, string>>({})
 
   const startEditing = (ann: TextAnnotation) => {
     setEditingId(ann.id)
@@ -38,6 +39,13 @@ export function AnnotationSidebar({ selectedAnnotations, onClose }: Props) {
     }
   }
 
+  const handleAddComment = async (annId: string) => {
+    const content = commentInputs[annId]
+    if (!content || !content.trim()) return
+    await addComment(annId, content)
+    setCommentInputs(prev => ({ ...prev, [annId]: "" }))
+  }
+
   if (selectedAnnotations.length === 0) return null
 
   return (
@@ -55,8 +63,9 @@ export function AnnotationSidebar({ selectedAnnotations, onClose }: Props) {
           const isEditing = editingId === ann.id
 
           return (
-            <div key={ann.id} className="border border-gray-200 rounded-lg p-3 bg-gray-50/50">
-              <div className="flex items-center justify-between mb-2">
+            <div key={ann.id} className="border border-gray-200 rounded-lg p-3 bg-gray-50/50 flex flex-col gap-3">
+              {/* Header */}
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div
                     className="w-2.5 h-2.5 rounded-full"
@@ -84,12 +93,18 @@ export function AnnotationSidebar({ selectedAnnotations, onClose }: Props) {
                 </div>
               </div>
 
+              {/* Author Note */}
+              <div className="text-xs text-gray-500 font-medium">
+                Annotated by: {ann.user?.username || "Unknown"}
+              </div>
+
+              {/* Original Note */}
               {isEditing ? (
-                <div className="mt-2">
+                <div>
                   <textarea
                     value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
-                    className="w-full text-sm border border-gray-300 rounded p-2 focus:outline-none focus:border-blue-500 min-h-[80px]"
+                    className="w-full text-sm text-gray-900 placeholder-gray-500 border border-gray-300 rounded p-2 focus:outline-none focus:border-blue-500 min-h-[80px]"
                     placeholder="Type your note here..."
                     autoFocus
                   />
@@ -110,7 +125,7 @@ export function AnnotationSidebar({ selectedAnnotations, onClose }: Props) {
                 </div>
               ) : (
                 <div 
-                  className={`mt-2 ${!ann.content ? "cursor-pointer" : ""}`}
+                  className={`border-b border-gray-200 pb-3 ${!ann.content ? "cursor-pointer" : ""}`}
                   onClick={() => {
                     if (!ann.content) startEditing(ann)
                   }}
@@ -120,6 +135,39 @@ export function AnnotationSidebar({ selectedAnnotations, onClose }: Props) {
                   </p>
                 </div>
               )}
+
+              {/* Comments (Chat) Section */}
+              <div className="flex flex-col gap-2">
+                {ann.comments && ann.comments.length > 0 && (
+                  <div className="flex flex-col gap-2 max-h-40 overflow-y-auto pr-1">
+                    {ann.comments.map(comment => (
+                      <div key={comment.id} className="bg-white border border-gray-100 rounded p-2 text-xs">
+                        <span className="font-semibold text-gray-800 mr-1">{comment.user?.username || "User"}:</span>
+                        <span className="text-gray-700 whitespace-pre-wrap">{comment.content}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex items-center gap-2 mt-1">
+                  <input 
+                    type="text" 
+                    value={commentInputs[ann.id] || ""}
+                    onChange={e => setCommentInputs(prev => ({ ...prev, [ann.id]: e.target.value }))}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") handleAddComment(ann.id)
+                    }}
+                    placeholder="Reply..."
+                    className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500"
+                  />
+                  <button 
+                    onClick={() => handleAddComment(ann.id)}
+                    className="p-1 bg-black text-white rounded hover:bg-gray-800"
+                  >
+                    <Send size={12} />
+                  </button>
+                </div>
+              </div>
+
             </div>
           )
         })}

@@ -14,8 +14,16 @@ export const getProjects = async (req: Request, res: Response): Promise<void> =>
     }
 
     const projects = await prisma.project.findMany({
-      where: { ownerId: userId },
+      where: {
+        OR: [
+          { ownerId: userId },
+          { members: { some: { userId } } }
+        ]
+      },
       orderBy: { updatedAt: 'desc' },
+      include: {
+        owner: { select: { username: true } },
+      }
     });
 
     res.json(projects);
@@ -39,7 +47,17 @@ export const getProjectById = async (req: Request, res: Response): Promise<void>
 
     const id = req.params.id as string;
     const project = await prisma.project.findFirst({
-      where: { id, ownerId: userId },
+      where: {
+        id,
+        OR: [
+          { ownerId: userId },
+          { members: { some: { userId } } }
+        ]
+      },
+      include: {
+        owner: { select: { username: true } },
+        members: { where: { userId } } // Just to include user's role if needed
+      }
     });
 
     if (!project) {

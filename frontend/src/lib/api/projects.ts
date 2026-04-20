@@ -104,3 +104,47 @@ export async function deleteDocument(id: string): Promise<void> {
   const res = await authFetch(`${API_BASE_URL}/documents/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(await extractError(res, "Failed to delete document"));
 }
+
+// --- Project Members & Invites ---
+
+export async function getProjectMembers(projectId: string) {
+  const res = await authFetch(`${API_BASE_URL}/projects/${projectId}/members`);
+  if (!res.ok) throw new Error(await extractError(res, "Failed to fetch project members"));
+  return res.json();
+}
+
+export async function removeProjectMember(projectId: string, memberId: string): Promise<void> {
+  const res = await authFetch(`${API_BASE_URL}/projects/${projectId}/members/${memberId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(await extractError(res, "Failed to remove member"));
+}
+
+export async function updateMemberRole(projectId: string, memberId: string, role: string) {
+  const res = await authFetch(`${API_BASE_URL}/projects/${projectId}/members/${memberId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role }),
+  });
+  if (!res.ok) throw new Error(await extractError(res, "Failed to update member role"));
+  return res.json();
+}
+
+export async function createInviteLink(projectId: string, role: string) {
+  const res = await authFetch(`${API_BASE_URL}/projects/${projectId}/invites`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role }),
+  });
+  if (!res.ok) throw new Error(await extractError(res, "Failed to create invite link"));
+  return res.json();
+}
+
+export async function joinProjectViaLink(token: string) {
+  const res = await authFetch(`${API_BASE_URL}/projects/join/${token}`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error(await extractError(res, "Failed to join project"));
+  return res.json();
+}
+
