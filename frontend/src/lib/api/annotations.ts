@@ -82,3 +82,20 @@ export async function createAnnotationComment(annotationId: string, content: str
   if (!res.ok) throw new Error("Failed to create comment");
   return res.json();
 }
+
+export async function deleteAnnotationComment(commentId: string): Promise<void> {
+  const res = await authFetch(`${API_BASE_URL}/annotations/comments/${commentId}`, {
+    method: "DELETE",
+  })
+  if (!res.ok) throw new Error("Failed to delete comment")
+}
+
+export async function createAnnotationStreamToken(docId: string): Promise<{ streamToken: string; expiresInSeconds: number }> {
+  const res = await authFetch(`${API_BASE_URL}/annotations/stream-token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ docId }),
+  })
+  if (!res.ok) throw new Error("Failed to create stream token")
+  return res.json()
+}

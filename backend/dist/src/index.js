@@ -16,14 +16,23 @@ const userRoutes_1 = __importDefault(require("./routes/userRoutes"));
 const errorHandler_1 = require("./middleware/errorHandler");
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
-app.use((0, cors_1.default)());
-app.use((req, res, next) => {
-    console.log(`[DIAGNOSTIC] ${req.method} ${req.path}`);
-    if (req.path.includes('profile-image')) {
-        console.log('[DIAGNOSTIC] Matching request found!');
-    }
-    next();
-});
+const allowedOrigins = (process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+app.use((0, cors_1.default)({
+    origin: (origin, cb) => {
+        // Allow non-browser or same-origin requests (no Origin header)
+        if (!origin)
+            return cb(null, true);
+        if (allowedOrigins.includes(origin))
+            return cb(null, true);
+        return cb(new Error('Not allowed by CORS'));
+    },
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+}));
 app.use(express_1.default.json({ limit: '100mb' }));
 app.use(express_1.default.urlencoded({ limit: '100mb', extended: true }));
 // Routes
@@ -34,10 +43,6 @@ app.use('/api/auth', authRoutes_1.default);
 app.use('/api/projects', projectRoutes_1.default);
 app.use('/api/projects', projectMemberRoutes_1.default);
 app.use('/api/documents', documentRoutes_1.default);
-// DIRECT TEST ROUTE
-app.post('/api/test-profile', (req, res) => {
-    res.status(200).json({ message: 'TOP LEVEL TEST REACHED' });
-});
 // Error handling middleware (must be last)
 app.use(errorHandler_1.errorHandler);
 // Start server (Prisma connects lazily on first query)

@@ -11,10 +11,16 @@ type Props = {
 }
 
 export function AnnotationSidebar({ selectedAnnotations, onClose }: Props) {
-  const { labels, editAnnotation, removeAnnotation, addComment } = useAnnotations()
+  const { labels, annotations, editAnnotation, removeAnnotation, addComment, removeComment } = useAnnotations()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editContent, setEditContent] = useState("")
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({})
+
+  // `selectedAnnotations` may be derived from a parent snapshot. Resolve to the latest
+  // annotation objects in context so replies update instantly.
+  const resolvedSelected = selectedAnnotations
+    .map((a) => annotations.find((x) => x.id === a.id) ?? a)
+    .filter(Boolean)
 
   const startEditing = (ann: TextAnnotation) => {
     setEditingId(ann.id)
@@ -46,7 +52,13 @@ export function AnnotationSidebar({ selectedAnnotations, onClose }: Props) {
     setCommentInputs(prev => ({ ...prev, [annId]: "" }))
   }
 
-  if (selectedAnnotations.length === 0) return null
+  const handleDeleteComment = async (annotationId: string, commentId: string) => {
+    const confirm = window.confirm("Delete this reply?")
+    if (!confirm) return
+    await removeComment(annotationId, commentId)
+  }
+
+  if (resolvedSelected.length === 0) return null
 
   return (
     <div className="w-80 h-full border-l border-gray-200 bg-white flex flex-col shadow-sm flex-shrink-0">
@@ -58,7 +70,7 @@ export function AnnotationSidebar({ selectedAnnotations, onClose }: Props) {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {selectedAnnotations.map((ann) => {
+        {resolvedSelected.map((ann) => {
           const label = labels.find((l) => l.id === ann.labelId)
           const isEditing = editingId === ann.id
 
@@ -142,8 +154,20 @@ export function AnnotationSidebar({ selectedAnnotations, onClose }: Props) {
                   <div className="flex flex-col gap-2 max-h-40 overflow-y-auto pr-1">
                     {ann.comments.map(comment => (
                       <div key={comment.id} className="bg-white border border-gray-100 rounded p-2 text-xs">
-                        <span className="font-semibold text-gray-800 mr-1">{comment.user?.username || "User"}:</span>
-                        <span className="text-gray-700 whitespace-pre-wrap">{comment.content}</span>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <span className="font-semibold text-gray-800 mr-1">{comment.user?.username || "User"}:</span>
+                            <span className="text-gray-700 whitespace-pre-wrap">{comment.content}</span>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteComment(ann.id, comment.id)}
+                            className="p-1 text-gray-700 hover:text-red-600 rounded"
+                            aria-label="Delete reply"
+                            title="Delete reply"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>

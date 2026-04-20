@@ -8,7 +8,6 @@ exports.default = (0, config_1.defineConfig)({
         path: "prisma/migrations",
     },
     datasource: {
-        // Use the DIRECT (non-pooled) URL for migrations
-        url: process.env["DIRECT_URL"],
+        url: (0, config_1.env)("DATABASE_URL"),
     },
 });

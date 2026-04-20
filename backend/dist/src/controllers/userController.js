@@ -11,9 +11,6 @@ const userService_1 = __importDefault(require("../services/userService"));
  * Body: { profileImage: string }
  */
 const updateProfileImage = async (req, res) => {
-    // DEBUG BYPASS
-    res.status(200).json({ message: 'DEBUG REACHED' });
-    return;
     try {
         const userId = req.user?.userId;
         console.log('[updateProfileImage] User ID from request:', userId);
