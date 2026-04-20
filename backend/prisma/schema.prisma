@@ -18,6 +18,7 @@ model User {
   resetTokenExpiry  DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+  profileImage      String?
 
   projects           Project[]
   labels             Label[]

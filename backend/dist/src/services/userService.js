@@ -125,5 +125,19 @@ class UserService {
         });
         return user;
     }
+    /**
+     * Update a user's profile image
+     * @param userId - ID of the user
+     * @param imageUrl - URL or base64 string of the image
+     * @returns Updated user object without password
+     */
+    async updateProfileImage(userId, imageUrl) {
+        const user = await db_1.default.user.update({
+            where: { id: userId },
+            data: { profileImage: imageUrl },
+        });
+        const { password, ...userWithoutPassword } = user;
+        return userWithoutPassword;
+    }
 }
 exports.default = new UserService();

@@ -21,7 +21,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <ProjectProvider>
           <AnnotationProvider>
-            <main className="min-h-screen flex flex-col items-center">
+            <main className="min-h-screen flex flex-col">
               {children}
             </main>
           </AnnotationProvider>
