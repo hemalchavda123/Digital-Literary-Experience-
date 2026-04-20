@@ -4,6 +4,10 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactN
 import { AnnotationLabel, TextAnnotation } from "@/types/annotation"
 import * as api from "@/lib/api/annotations"
 
+type CommentCreatedEvent = { annotationId: string; comment: NonNullable<TextAnnotation["comments"]>[number] }
+type CommentUpdatedEvent = { annotationId: string; comment: NonNullable<TextAnnotation["comments"]>[number] }
+type CommentDeletedEvent = { annotationId: string; commentId: string }
+
 type AnnotationContextValue = {
   labels: AnnotationLabel[]
   annotations: TextAnnotation[]
@@ -32,7 +36,7 @@ export function useAnnotations() {
 export function AnnotationProvider({ children }: { children: ReactNode }) {
   const [labels, setLabels] = useState<AnnotationLabel[]>([])
   const [annotations, setAnnotations] = useState<TextAnnotation[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeDocId, setActiveDocId] = useState<string | null>(null)
   const sseRef = useRef<EventSource | null>(null)
@@ -45,8 +49,8 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
     try {
       const data = await api.getLabelsForProject(projectId)
       setLabels(data)
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to fetch labels")
     }
   }, [])
 
@@ -55,8 +59,8 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
       const data = await api.getAnnotationsForDocument(docId)
       setAnnotations(data)
       setActiveDocId(docId)
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to fetch annotations")
     }
   }, [])
 
@@ -82,7 +86,7 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
 
         const onCreated = (e: MessageEvent) => {
           try {
-            const payload = JSON.parse(e.data) as { annotationId: string; comment: any }
+            const payload = JSON.parse(e.data) as CommentCreatedEvent
             setAnnotations((prev) =>
               prev.map((a) => {
                 if (a.id !== payload.annotationId) return a
@@ -96,7 +100,7 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
 
         const onUpdated = (e: MessageEvent) => {
           try {
-            const payload = JSON.parse(e.data) as { annotationId: string; comment: any }
+            const payload = JSON.parse(e.data) as CommentUpdatedEvent
             setAnnotations((prev) =>
               prev.map((a) => {
                 if (a.id !== payload.annotationId) return a
@@ -111,7 +115,7 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
 
         const onDeleted = (e: MessageEvent) => {
           try {
-            const payload = JSON.parse(e.data) as { annotationId: string; commentId: string }
+            const payload = JSON.parse(e.data) as CommentDeletedEvent
             setAnnotations((prev) =>
               prev.map((a) => {
                 if (a.id !== payload.annotationId) return a
@@ -165,8 +169,8 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
     try {
       const newLabel = await api.createLabel(projectId, name, color)
       setLabels((prev) => [...prev, newLabel])
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to create label")
       throw err
     }
   }
@@ -175,8 +179,8 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
     try {
       const updated = await api.updateLabel(id, name, color)
       setLabels((prev) => prev.map((l) => (l.id === id ? updated : l)))
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to update label")
       throw err
     }
   }
@@ -185,8 +189,8 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
     try {
       await api.deleteLabel(id)
       setLabels((prev) => prev.filter((l) => l.id !== id))
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to delete label")
       throw err
     }
   }
@@ -195,8 +199,8 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
     try {
       const newAnn = await api.createAnnotation(docId, labelId, startOffset, endOffset, content)
       setAnnotations((prev) => [...prev, newAnn])
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to create annotation")
       throw err
     }
   }
@@ -205,8 +209,8 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
     try {
       const updated = await api.updateAnnotation(id, content, labelId)
       setAnnotations((prev) => prev.map((a) => (a.id === id ? updated : a)))
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to update annotation")
       throw err
     }
   }
@@ -215,8 +219,8 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
     try {
       await api.deleteAnnotation(id)
       setAnnotations((prev) => prev.filter((a) => a.id !== id))
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to delete annotation")
       throw err
     }
   }
@@ -232,8 +236,8 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
         }
         return a
       }))
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to create reply")
       throw err
     }
   }
@@ -248,8 +252,8 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
           return { ...a, comments: (a.comments || []).filter((c) => c.id !== commentId) }
         })
       )
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to delete reply")
       throw err
     }
   }

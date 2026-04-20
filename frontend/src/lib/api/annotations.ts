@@ -55,8 +55,8 @@ export async function createAnnotation(docId: string, labelId: string, startOffs
 }
 
 export async function updateAnnotation(id: string, content: string, labelId?: string): Promise<TextAnnotation> {
-  const body: any = { content };
-  if (labelId) body.labelId = labelId;
+  const body: { content: string; labelId?: string } = { content }
+  if (labelId) body.labelId = labelId
   const res = await authFetch(`${API_BASE_URL}/annotations/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },

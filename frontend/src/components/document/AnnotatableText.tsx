@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { TextAnnotation, AnnotationLabel } from "@/types/annotation"
+import { TextAnnotation } from "@/types/annotation"
 import { useAnnotations } from "@/context/AnnotationContext"
 
 type Props = {
@@ -17,6 +17,34 @@ type Segment = {
   endOffset: number
 }
 
+function stableAnnotationSort(a: TextAnnotation, b: TextAnnotation) {
+  const ca = a.createdAt ?? ""
+  const cb = b.createdAt ?? ""
+  if (ca !== cb) return ca.localeCompare(cb)
+  return a.id.localeCompare(b.id)
+}
+
+function buildStripedBackground(colors: string[]) {
+  const unique = Array.from(new Set(colors)).filter(Boolean)
+  const max = 5
+  const used = unique.slice(0, max)
+  const extra = unique.length - used.length
+
+  const finalColors = extra > 0 ? [...used.slice(0, Math.max(1, used.length - 1)), "#e5e7eb"] : used
+  if (finalColors.length === 1) return finalColors[0]
+
+  const step = 100 / finalColors.length
+  const stops = finalColors
+    .map((c, idx) => {
+      const from = idx * step
+      const to = (idx + 1) * step
+      return `${c} ${from}%, ${c} ${to}%`
+    })
+    .join(", ")
+
+  return `linear-gradient(90deg, ${stops})`
+}
+
 export function AnnotatableText({ text, docId, onAnnotationClick }: Props) {
   const { annotations, labels, addAnnotation } = useAnnotations()
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; start: number; end: number } | null>(null)
@@ -27,7 +55,8 @@ export function AnnotatableText({ text, docId, onAnnotationClick }: Props) {
     if (!text) return []
     const charAnns: TextAnnotation[][] = Array.from({ length: text.length }, () => [])
     
-    annotations.forEach((ann) => {
+    const ordered = [...annotations].sort(stableAnnotationSort)
+    ordered.forEach((ann) => {
       // Validate offsets
       const start = Math.max(0, ann.startOffset)
       const end = Math.min(text.length, ann.endOffset)
@@ -125,20 +154,26 @@ export function AnnotatableText({ text, docId, onAnnotationClick }: Props) {
             return <span key={i}>{seg.text}</span>
           }
 
-          // Mix colors if overlapping, or pick the last one
-          const lastAnn = seg.annotations[seg.annotations.length - 1]
-          const label = labels.find((l) => l.id === lastAnn.labelId)
-          const bgColor = label ? label.color : "#fbbf24" // default amber-400
+          const colors = seg.annotations
+            .map((ann) => labels.find((l) => l.id === ann.labelId)?.color)
+            .filter((c): c is string => !!c)
+
+          const style =
+            colors.length <= 1
+              ? { backgroundColor: colors[0] || "#fbbf24" }
+              : { backgroundImage: buildStripedBackground(colors) }
 
           return (
             <span
               key={i}
               onClick={(e) => {
                 e.stopPropagation()
-                onAnnotationClick(seg.annotations)
+                if (e.shiftKey) {
+                  onAnnotationClick(seg.annotations)
+                }
               }}
               className="cursor-pointer transition-colors hover:brightness-95"
-              style={{ backgroundColor: bgColor }}
+              style={style}
             >
               {seg.text}
             </span>

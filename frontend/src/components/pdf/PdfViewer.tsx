@@ -15,13 +15,57 @@ type Props = {
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs`
 
+type HighlightBox = {
+  top: number
+  left: number
+  width: number
+  height: number
+  annotationIds: string[]
+}
+
+function rectsOverlap(a: HighlightBox, b: HighlightBox, eps = 1.5) {
+  const ax2 = a.left + a.width
+  const ay2 = a.top + a.height
+  const bx2 = b.left + b.width
+  const by2 = b.top + b.height
+  return !(ax2 < b.left - eps || bx2 < a.left - eps || ay2 < b.top - eps || by2 < a.top - eps)
+}
+
+function mergeBoxes(a: HighlightBox, b: HighlightBox): HighlightBox {
+  const left = Math.min(a.left, b.left)
+  const top = Math.min(a.top, b.top)
+  const right = Math.max(a.left + a.width, b.left + b.width)
+  const bottom = Math.max(a.top + a.height, b.top + b.height)
+  const ids = Array.from(new Set([...a.annotationIds, ...b.annotationIds]))
+  return { left, top, width: right - left, height: bottom - top, annotationIds: ids }
+}
+
+function buildStripedBackground(colors: string[]) {
+  const unique = Array.from(new Set(colors)).filter(Boolean)
+  const max = 5
+  const used = unique.slice(0, max)
+  const extra = unique.length - used.length
+  const finalColors = extra > 0 ? [...used.slice(0, Math.max(1, used.length - 1)), "#e5e7eb"] : used
+  if (finalColors.length === 1) return { backgroundColor: finalColors[0] }
+
+  const step = 100 / finalColors.length
+  const stops = finalColors
+    .map((c, idx) => {
+      const from = idx * step
+      const to = (idx + 1) * step
+      return `${c} ${from}%, ${c} ${to}%`
+    })
+    .join(", ")
+  return { backgroundImage: `linear-gradient(90deg, ${stops})` }
+}
+
 export function PdfViewer({ doc, onAnnotationClick }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isRendered, setIsRendered] = useState(false)
   const { annotations, labels, addAnnotation } = useAnnotations()
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; start: number; end: number } | null>(null)
-  const [highlights, setHighlights] = useState<{ top: number; left: number; width: number; height: number; color: string; annotationIds: string[] }[]>([])
+  const [highlights, setHighlights] = useState<HighlightBox[]>([])
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -103,7 +147,7 @@ export function PdfViewer({ doc, onAnnotationClick }: Props) {
     const container = containerRef.current
     const containerRect = container.getBoundingClientRect()
     
-    const newHighlights: { top: number; left: number; width: number; height: number; color: string; annotationIds: string[] }[] = []
+    const raw: HighlightBox[] = []
     
     annotations.forEach(ann => {
       const label = labels.find(l => l.id === ann.labelId)
@@ -115,18 +159,31 @@ export function PdfViewer({ doc, onAnnotationClick }: Props) {
       const rects = range.getClientRects()
       for (let i = 0; i < rects.length; i++) {
         const rect = rects[i]
-        newHighlights.push({
+        raw.push({
           top: rect.top - containerRect.top,
           left: rect.left - containerRect.left,
           width: rect.width,
           height: rect.height,
-          color: label.color,
           annotationIds: [ann.id]
         })
       }
     })
-    
-    setHighlights(newHighlights)
+
+    // Merge overlapping boxes so clicking an overlap selects all annotations.
+    const merged: HighlightBox[] = []
+    for (const box of raw) {
+      let didMerge = false
+      for (let i = 0; i < merged.length; i++) {
+        if (rectsOverlap(merged[i], box)) {
+          merged[i] = mergeBoxes(merged[i], box)
+          didMerge = true
+          break
+        }
+      }
+      if (!didMerge) merged.push(box)
+    }
+
+    setHighlights(merged)
   }, [annotations, isRendered, labels])
 
   useEffect(() => {
@@ -254,15 +311,20 @@ export function PdfViewer({ doc, onAnnotationClick }: Props) {
               left: h.left,
               width: h.width,
               height: h.height,
-              backgroundColor: h.color,
+              ...(buildStripedBackground(
+                h.annotationIds
+                  .map((id) => annotations.find((a) => a.id === id))
+                  .map((a) => labels.find((l) => l.id === a?.labelId)?.color)
+                  .filter((c): c is string => !!c)
+              )),
               zIndex: 10
             }}
             onClick={(e) => {
               e.stopPropagation()
-              if (onAnnotationClick) {
-                const clickedAnns = annotations.filter(a => h.annotationIds.includes(a.id))
-                onAnnotationClick(clickedAnns)
-              }
+              if (!e.shiftKey) return
+              if (!onAnnotationClick) return
+              const clickedAnns = annotations.filter(a => h.annotationIds.includes(a.id))
+              onAnnotationClick(clickedAnns)
             }}
           />
         ))}

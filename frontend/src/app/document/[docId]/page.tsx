@@ -102,7 +102,7 @@ export default function DocumentPage() {
   const pdfSource = doc.kind === "pdf" ? (doc.content || doc.pdfUrl || "") : ""
 
   return (
-    <div className="min-h-screen w-full flex flex-col bg-white">
+    <div className="h-screen w-full flex flex-col bg-white">
       {/* Document viewer navbar */}
       <header className="h-12 border-b border-gray-200 flex items-center justify-between px-4 text-sm bg-white">
         <div className="flex items-center gap-3 min-w-0">
@@ -143,8 +143,10 @@ export default function DocumentPage() {
       </header>
 
       {/* Google Docs–style: light gray canvas with centered white page */}
-      <main className="flex-1 w-full flex bg-gray-100 overflow-hidden">
-        <div className="flex-1 flex overflow-y-auto">
+      <main className="flex-1 w-full flex bg-gray-100 overflow-hidden min-h-0">
+        {/* Left: renderer has its own scrollbar */}
+        <div className="flex-1 flex overflow-hidden min-h-0">
+          <div className="flex-1 overflow-y-auto min-h-0">
           {doc.kind === "pdf" ? (
             // Scrollable PDF viewer with centered white "page"
             <div className="flex-1 flex justify-center py-8">
@@ -175,6 +177,7 @@ export default function DocumentPage() {
               </div>
             </div>
           )}
+          </div>
         </div>
         
         <AnnotationSidebar
