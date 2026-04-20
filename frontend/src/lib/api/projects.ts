@@ -148,3 +148,37 @@ export async function joinProjectViaLink(token: string) {
   return res.json();
 }
 
+export async function updateMemberPermissions(
+  projectId: string,
+  userId: string,
+  permissions: {
+    canViewOthersAnnotations?: boolean;
+    canAnnotate?: boolean;
+    canViewAdminAnnotations?: boolean;
+  }
+) {
+  const res = await authFetch(`${API_BASE_URL}/projects/${projectId}/members/${userId}/permissions`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(permissions),
+  });
+  if (!res.ok) throw new Error(await extractError(res, "Failed to update permissions"));
+  return res.json();
+}
+
+export async function updateDefaultPermissions(
+  projectId: string,
+  permissions: {
+    defaultCanViewAnnotations?: boolean;
+    defaultCanAnnotate?: boolean;
+    defaultCanViewAdminAnnotations?: boolean;
+  }
+): Promise<Project> {
+  const res = await authFetch(`${API_BASE_URL}/projects/${projectId}/default-permissions`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(permissions),
+  });
+  if (!res.ok) throw new Error(await extractError(res, "Failed to update default permissions"));
+  return res.json();
+}

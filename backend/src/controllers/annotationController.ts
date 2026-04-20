@@ -37,6 +37,25 @@ async function ensureUserCanAccessDocOr404(docId: string, userId: string, res: R
   return true;
 }
 
+async function getUserPermissions(docId: string, userId: string) {
+  const doc = await prisma.document.findUnique({
+    where: { id: docId },
+    select: { projectId: true },
+  });
+  if (!doc) return null;
+
+  const member = await prisma.projectMember.findFirst({
+    where: { projectId: doc.projectId, userId },
+    select: {
+      canViewOthersAnnotations: true,
+      canAnnotate: true,
+      canViewAdminAnnotations: true,
+    },
+  });
+
+  return member;
+}
+
 export const getAnnotationsByDoc = async (req: Request, res: Response) => {
   try {
     const docId = req.params.docId as string;
@@ -46,7 +65,27 @@ export const getAnnotationsByDoc = async (req: Request, res: Response) => {
     }
     if (!(await ensureUserCanAccessDocOr404(docId, userId, res))) return;
 
-    const annotations = await prisma.annotation.findMany({
+    const permissions = await getUserPermissions(docId, userId);
+    const isOwner = await isProjectOwnerForDoc(docId, userId);
+
+    // Owners see all annotations
+    if (isOwner) {
+      const annotations = await prisma.annotation.findMany({
+        where: { docId },
+        include: {
+          user: { select: { username: true } },
+          comments: {
+            include: { user: { select: { username: true } } },
+            orderBy: { createdAt: 'asc' }
+          }
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+      return res.json(annotations);
+    }
+
+    // Non-owners: filter based on permissions
+    const allAnnotations = await prisma.annotation.findMany({
       where: { docId },
       include: {
         user: { select: { username: true } },
@@ -57,7 +96,30 @@ export const getAnnotationsByDoc = async (req: Request, res: Response) => {
       },
       orderBy: { createdAt: 'asc' },
     });
-    res.json(annotations);
+
+    // Filter annotations based on permissions
+    const filteredAnnotations: any[] = [];
+    for (const ann of allAnnotations) {
+      // Always show user's own annotations
+      if (ann.userId === userId) {
+        filteredAnnotations.push(ann);
+        continue;
+      }
+
+      // If canViewOthersAnnotations is false, hide others' annotations
+      if (!permissions?.canViewOthersAnnotations) continue;
+
+      // If canViewAdminAnnotations is false and the annotation is from an admin (owner), hide it
+      if (!permissions?.canViewAdminAnnotations) {
+        // Check if annotation author is project owner
+        const isAnnotatorOwner = await isProjectOwnerForDoc(docId, ann.userId);
+        if (isAnnotatorOwner) continue;
+      }
+
+      filteredAnnotations.push(ann);
+    }
+
+    res.json(filteredAnnotations);
   } catch (error) {
     console.error('Error fetching annotations:', error);
     res.status(500).json({ error: 'Failed to fetch annotations' });
@@ -74,6 +136,15 @@ export const createAnnotation = async (req: Request, res: Response) => {
     }
 
     if (!(await ensureUserCanAccessDocOr404(docId, userId, res))) return;
+
+    // Check if user can annotate (unless they're the owner)
+    const isOwner = await isProjectOwnerForDoc(docId, userId);
+    if (!isOwner) {
+      const permissions = await getUserPermissions(docId, userId);
+      if (!permissions?.canAnnotate) {
+        return res.status(403).json({ error: 'You do not have permission to annotate this document' });
+      }
+    }
 
     // Ensure label belongs to the same project as the document (prevents cross-project tampering)
     const [doc, label] = await Promise.all([

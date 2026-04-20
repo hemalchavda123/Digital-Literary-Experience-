@@ -185,3 +185,109 @@ export const deleteProject = async (req: Request, res: Response): Promise<void> 
     res.status(500).json({ error: 'Failed to delete project' });
   }
 };
+
+/**
+ * Update member permissions (only project owner can do this)
+ * PUT /api/projects/:projectId/members/:userId/permissions
+ * Body: { canViewOthersAnnotations, canAnnotate, canViewAdminAnnotations }
+ */
+export const updateMemberPermissions = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const projectId = req.params.projectId as string;
+    const memberUserId = req.params.userId as string;
+
+    // Verify user is project owner
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, ownerId: userId },
+    });
+
+    if (!project) {
+      res.status(403).json({ error: 'Only project owner can update permissions' });
+      return;
+    }
+
+    // Don't allow changing owner's permissions
+    if (memberUserId === userId) {
+      res.status(400).json({ error: 'Cannot change owner permissions' });
+      return;
+    }
+
+    // Verify the member exists in the project
+    const member = await prisma.projectMember.findFirst({
+      where: { projectId, userId: memberUserId },
+    });
+
+    if (!member) {
+      res.status(404).json({ error: 'Member not found in project' });
+      return;
+    }
+
+    const { canViewOthersAnnotations, canAnnotate, canViewAdminAnnotations } = req.body;
+
+    const updatedMember = await prisma.projectMember.update({
+      where: { id: member.id },
+      data: {
+        canViewOthersAnnotations: canViewOthersAnnotations !== undefined ? canViewOthersAnnotations : member.canViewOthersAnnotations,
+        canAnnotate: canAnnotate !== undefined ? canAnnotate : member.canAnnotate,
+        canViewAdminAnnotations: canViewAdminAnnotations !== undefined ? canViewAdminAnnotations : member.canViewAdminAnnotations,
+      },
+      include: {
+        user: { select: { username: true } },
+      },
+    });
+
+    res.json(updatedMember);
+  } catch (error) {
+    console.error('Error updating member permissions:', error);
+    res.status(500).json({ error: 'Failed to update permissions' });
+  }
+};
+
+/**
+ * Update default project permissions (only project owner can do this)
+ * PUT /api/projects/:projectId/default-permissions
+ * Body: { defaultCanViewAnnotations, defaultCanAnnotate, defaultCanViewAdminAnnotations }
+ */
+export const updateDefaultPermissions = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const projectId = req.params.projectId as string;
+
+    // Verify user is project owner
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, ownerId: userId },
+    });
+
+    if (!project) {
+      res.status(403).json({ error: 'Only project owner can update default permissions' });
+      return;
+    }
+
+    const { defaultCanViewAnnotations, defaultCanAnnotate, defaultCanViewAdminAnnotations } = req.body;
+
+    const updatedProject = await prisma.project.update({
+      where: { id: projectId },
+      data: {
+        defaultCanViewAnnotations: defaultCanViewAnnotations !== undefined ? defaultCanViewAnnotations : (project as any).defaultCanViewAnnotations,
+        defaultCanAnnotate: defaultCanAnnotate !== undefined ? defaultCanAnnotate : (project as any).defaultCanAnnotate,
+        defaultCanViewAdminAnnotations: defaultCanViewAdminAnnotations !== undefined ? defaultCanViewAdminAnnotations : (project as any).defaultCanViewAdminAnnotations,
+      } as any,
+    });
+
+    res.json(updatedProject);
+  } catch (error) {
+    console.error('Error updating default permissions:', error);
+    res.status(500).json({ error: 'Failed to update default permissions' });
+  }
+};

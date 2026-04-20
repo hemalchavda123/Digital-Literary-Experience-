@@ -11,6 +11,9 @@ export type ProjectMember = {
   projectId: string;
   userId: string;
   role: Role;
+  canViewOthersAnnotations: boolean;
+  canAnnotate: boolean;
+  canViewAdminAnnotations: boolean;
   createdAt: string;
   user?: User;
 }

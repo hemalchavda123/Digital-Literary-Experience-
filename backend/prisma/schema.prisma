@@ -36,11 +36,14 @@ enum Role {
 }
 
 model Project {
-  id        String     @id @default(uuid())
-  name      String
-  ownerId   String
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id                          String   @id @default(uuid())
+  name                        String
+  ownerId                     String
+  defaultCanViewAnnotations   Boolean  @default(false)
+  defaultCanAnnotate          Boolean  @default(true)
+  defaultCanViewAdminAnnotations Boolean @default(false)
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
 
   owner     User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   documents Document[]
@@ -103,12 +106,15 @@ model Annotation {
 }
 
 model ProjectMember {
-  id        String   @id @default(uuid())
-  projectId String
-  userId    String
-  role      Role     @default(VIEWER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                         String   @id @default(uuid())
+  projectId                  String
+  userId                     String
+  role                       Role     @default(VIEWER)
+  canViewOthersAnnotations   Boolean  @default(false)
+  canAnnotate                Boolean  @default(false)
+  canViewAdminAnnotations    Boolean  @default(false)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
 
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)

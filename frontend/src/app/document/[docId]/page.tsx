@@ -7,16 +7,18 @@ import { useAnnotations } from "@/context/AnnotationContext"
 import { AnnotatableText } from "@/components/document/AnnotatableText"
 import { AnnotationSidebar } from "@/components/document/AnnotationSidebar"
 import { LabelManagerModal } from "@/components/document/LabelManagerModal"
+import { ShareModal } from "@/components/project/ShareModal"
 import { TextAnnotation } from "@/types/annotation"
 import type { Document } from "@/types/document"
 import dynamic from "next/dynamic"
+import { getCurrentUser } from "@/lib/api/authFetch"
 
 const PdfViewer = dynamic(() => import("@/components/pdf/PdfViewer").then(mod => mod.PdfViewer), { ssr: false })
 
 export default function DocumentPage() {
   const params = useParams<{ docId: string }>()
   const router = useRouter()
-  const { getDocumentById, renameDocument, deleteDocument } = useProjects()
+  const { getDocumentById, renameDocument, deleteDocument, getProjectById } = useProjects()
   const { fetchLabels, fetchAnnotations } = useAnnotations()
   const [doc, setDoc] = useState<Document | null>(null)
   const [docLoading, setDocLoading] = useState(true)
@@ -24,6 +26,8 @@ export default function DocumentPage() {
   const [showLabelManager, setShowLabelManager] = useState(false)
   const [selectedAnnotations, setSelectedAnnotations] = useState<TextAnnotation[]>([])
   const [pdfTextContent, setPdfTextContent] = useState<string | null>(null)
+  const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false)
+  const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null)
 
   // Fetch document from backend on mount
   useEffect(() => {
@@ -40,6 +44,11 @@ export default function DocumentPage() {
     load()
     return () => { cancelled = true }
   }, [params.docId, getDocumentById])
+
+  // Fetch current user
+  useEffect(() => {
+    getCurrentUser().then(user => setCurrentUser(user))
+  }, [])
 
   // Fetch labels and annotations once doc is loaded
   useEffect(() => {
@@ -102,6 +111,9 @@ export default function DocumentPage() {
   // For PDFs stored as base64 data URLs, use the content field directly
   const pdfSource = doc.kind === "pdf" ? (doc.content || doc.pdfUrl || "") : ""
 
+  const project = getProjectById(doc.projectId)
+  const isOwner = currentUser?.id === project?.ownerId
+
   return (
     <div className="h-screen w-full flex flex-col bg-white">
       {/* Document viewer navbar */}
@@ -130,9 +142,15 @@ export default function DocumentPage() {
           >
             Manage Labels
           </button>
-          <span className="hidden sm:inline">
-            Chat · Permissions (coming soon)
-          </span>
+          {isOwner && (
+            <button
+              type="button"
+              onClick={() => setIsPermissionsModalOpen(true)}
+              className="rounded border border-gray-300 px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Permissions
+            </button>
+          )}
           <button
             type="button"
             onClick={handleDelete}
@@ -193,6 +211,14 @@ export default function DocumentPage() {
         <LabelManagerModal
           projectId={doc.projectId}
           onClose={() => setShowLabelManager(false)}
+        />
+      )}
+      {project && (
+        <ShareModal
+          isOpen={isPermissionsModalOpen}
+          onClose={() => setIsPermissionsModalOpen(false)}
+          projectId={project.id}
+          isOwner={isOwner}
         />
       )}
     </div>

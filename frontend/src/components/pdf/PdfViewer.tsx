@@ -174,7 +174,21 @@ export function PdfViewer({ doc, onAnnotationClick, onTextContentChange }: Props
       }
     })
 
-    setHighlights(raw)
+    // Merge overlapping boxes so clicking an overlap selects all annotations.
+    const merged: HighlightBox[] = []
+    for (const box of raw) {
+      let didMerge = false
+      for (let i = 0; i < merged.length; i++) {
+        if (rectsOverlap(merged[i], box)) {
+          merged[i] = mergeBoxes(merged[i], box)
+          didMerge = true
+          break
+        }
+      }
+      if (!didMerge) merged.push(box)
+    }
+
+    setHighlights(merged)
   }, [annotations, isRendered, labels])
 
   useEffect(() => {
@@ -289,7 +303,7 @@ export function PdfViewer({ doc, onAnnotationClick, onTextContentChange }: Props
   }
 
   const handleContainerMouseDown = (e: React.MouseEvent) => {
-    if (!e.shiftKey || !onAnnotationClick || !containerRef.current) return
+    if (!onAnnotationClick || !containerRef.current) return
     
     const containerRect = containerRef.current.getBoundingClientRect()
     const scrollContainer = containerRef.current.closest('.overflow-auto') as HTMLElement
@@ -299,13 +313,18 @@ export function PdfViewer({ doc, onAnnotationClick, onTextContentChange }: Props
     const x = e.clientX - containerRect.left + scrollLeft
     const y = e.clientY - containerRect.top + scrollTop
     
+    // Collect all annotations from all highlight boxes that contain the click
+    const clickedAnnotationIds = new Set<string>()
     for (const h of highlights) {
       if (x >= h.left && x <= h.left + h.width && y >= h.top && y <= h.top + h.height) {
-        e.stopPropagation()
-        const clickedAnns = annotations.filter(a => h.annotationIds.includes(a.id))
-        onAnnotationClick(clickedAnns)
-        break
+        h.annotationIds.forEach(id => clickedAnnotationIds.add(id))
       }
+    }
+    
+    if (clickedAnnotationIds.size > 0) {
+      e.stopPropagation()
+      const clickedAnns = annotations.filter(a => clickedAnnotationIds.has(a.id))
+      onAnnotationClick(clickedAnns)
     }
   }
 

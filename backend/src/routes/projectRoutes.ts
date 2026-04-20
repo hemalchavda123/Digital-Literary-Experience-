@@ -5,6 +5,8 @@ import {
   createProject,
   updateProject,
   deleteProject,
+  updateMemberPermissions,
+  updateDefaultPermissions,
 } from '../controllers/projectController';
 import { authMiddleware } from '../middleware/authMiddleware';
 
@@ -17,5 +19,7 @@ router.get('/:id', getProjectById);
 router.post('/', createProject);
 router.put('/:id', updateProject);
 router.delete('/:id', deleteProject);
+router.put('/:projectId/members/:userId/permissions', updateMemberPermissions);
+router.put('/:projectId/default-permissions', updateDefaultPermissions);
 
 export default router;
