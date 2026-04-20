@@ -54,8 +54,7 @@ export default function ProfilePage() {
 
       const response = await updateProfileImage(base64)
       setUser(response.user)
-      // Refresh the page or update global state to reflect in Navbar
-      window.location.reload() 
+      // Page reload removed to avoid refresh loop; state update is sufficient
     } catch (err) {
       console.error("Failed to upload image:", err)
       alert("Failed to upload profile image.")

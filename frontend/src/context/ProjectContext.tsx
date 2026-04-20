@@ -51,8 +51,31 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Load projects on mount
+  function getCookie(name: string): string | null {
+    if (typeof document === "undefined") return null
+    const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`))
+    return match ? match[1] : null
+  }
+
+  // Load projects only when the user is on an authenticated route
   useEffect(() => {
+    if (typeof window === "undefined") {
+      setLoading(false)
+      return
+    }
+
+    const publicRoutes = ["/signup2", "/signup", "/login", "/forgot-password", "/auth"]
+    if (publicRoutes.some((route) => window.location.pathname === route || window.location.pathname.startsWith(route + "/"))) {
+      setLoading(false)
+      return
+    }
+
+    const token = getCookie("accessToken")
+    if (!token) {
+      setLoading(false)
+      return
+    }
+
     refreshProjects()
   }, [refreshProjects])
 
