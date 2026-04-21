@@ -254,7 +254,7 @@ export function AnnotationSidebar({ selectedAnnotations, onClose, documentText }
                         if (e.key === "Enter") handleAddComment(ann.id)
                       }}
                       placeholder="Write a reply…"
-                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-black bg-white"
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-black bg-white"
                     />
                     <button
                       onClick={() => handleAddComment(ann.id)}

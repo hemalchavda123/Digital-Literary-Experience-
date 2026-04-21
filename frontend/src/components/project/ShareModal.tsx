@@ -219,7 +219,7 @@ export function ShareModal({ isOpen, onClose, projectId, isOwner = false }: Prop
                   <select
                     value={inviteRole}
                     onChange={e => setInviteRole(e.target.value as Role)}
-                    className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-black"
+                    className="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-black"
                   >
                     <option value="VIEWER">Can View</option>
                     <option value="EDITOR">Can Edit</option>
@@ -237,7 +237,7 @@ export function ShareModal({ isOpen, onClose, projectId, isOwner = false }: Prop
                       type="text"
                       readOnly
                       value={inviteLink}
-                      className="flex-1 bg-gray-50 border border-gray-200 rounded px-3 py-2 text-sm text-gray-700 focus:outline-none"
+                      className="flex-1 bg-gray-50 border border-gray-200 rounded px-3 py-2 text-sm text-gray-900 focus:outline-none"
                     />
                     <button
                       onClick={handleCopy}
@@ -260,12 +260,12 @@ export function ShareModal({ isOpen, onClose, projectId, isOwner = false }: Prop
                     value={inviteUserId}
                     onChange={e => setInviteUserId(e.target.value)}
                     placeholder="Enter user ID"
-                    className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-black"
+                    className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-black"
                   />
                   <select
                     value={inviteRole}
                     onChange={e => setInviteRole(e.target.value as Role)}
-                    className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-black"
+                    className="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-black"
                   >
                     <option value="VIEWER">Can View</option>
                     <option value="EDITOR">Can Edit</option>
@@ -289,12 +289,12 @@ export function ShareModal({ isOpen, onClose, projectId, isOwner = false }: Prop
                     value={inviteEmail}
                     onChange={e => setInviteEmail(e.target.value)}
                     placeholder="Enter email address"
-                    className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-black"
+                    className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-black"
                   />
                   <select
                     value={inviteRole}
                     onChange={e => setInviteRole(e.target.value as Role)}
-                    className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-black"
+                    className="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-black"
                   >
                     <option value="VIEWER">Can View</option>
                     <option value="EDITOR">Can Edit</option>
