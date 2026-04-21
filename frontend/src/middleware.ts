@@ -30,9 +30,14 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl)
   }
 
-  // Token exists — allow the request through
-  // (The backend will do the actual token verification on API calls)
-  return NextResponse.next()
+  // Token exists — allow the request through with cache control headers
+  // Add cache control headers to prevent browser caching of protected pages
+  const response = NextResponse.next()
+  response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  response.headers.set('Pragma', 'no-cache')
+  response.headers.set('Expires', '0')
+  
+  return response
 }
 
 export const config = {

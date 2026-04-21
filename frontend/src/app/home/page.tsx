@@ -1,5 +1,6 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import Navbar from "@/components/Navbar"
 import Footer from "@/components/Footer"
 import { SearchBar } from "@/components/dashboard/SearchBar"
@@ -7,6 +8,7 @@ import { FilterDropdown } from "@/components/dashboard/FilterDropdown"
 import { ProjectGrid } from "@/components/dashboard/ProjectGrid"
 import { CreateProjectModal } from "@/components/dashboard/CreateProjectModal"
 import { useProjects } from "@/context/ProjectContext"
+import { getCurrentUser } from "@/lib/api/authFetch"
 
 function sortProjects(projects: ReturnType<typeof useProjects>["projects"], filter: "all" | "recent" | "alphabetical") {
   const copy = [...projects]
@@ -19,10 +21,48 @@ function sortProjects(projects: ReturnType<typeof useProjects>["projects"], filt
 }
 
 export default function HomePage() {
+  const router = useRouter()
   const { projects, loading } = useProjects()
   const [searchQuery, setSearchQuery] = useState("")
   const [filter, setFilter] = useState<"all" | "recent" | "alphabetical">("all")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [authChecked, setAuthChecked] = useState(false)
+
+  useEffect(() => {
+    // Check authentication immediately on mount
+    const checkAuth = async () => {
+      try {
+        const user = await getCurrentUser()
+        if (!user) {
+          // Redirect immediately if not authenticated
+          window.location.href = "/signup2"
+          return
+        }
+        setIsAuthenticated(true)
+      } catch (error) {
+        window.location.href = "/signup2"
+        return
+      } finally {
+        setAuthChecked(true)
+      }
+    }
+    checkAuth()
+  }, [])
+
+  // Don't render anything until auth check is complete
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-white">
+        <p className="text-sm text-gray-500">Loading...</p>
+      </div>
+    )
+  }
+
+  // If auth check completed but not authenticated, don't render (redirect is happening)
+  if (!isAuthenticated) {
+    return null
+  }
 
   const filtered = sortProjects(projects, filter).filter((project) =>
     project.name.toLowerCase().includes(searchQuery.toLowerCase())

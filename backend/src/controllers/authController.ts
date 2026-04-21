@@ -323,7 +323,7 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
 
     // TODO: Send email with reset token
     // For now, we'll just log it (in production, this would be sent via email)
-    console.log(`Password reset token for ${email}: ${resetToken}`);
+    // console.log(`Password reset token for ${email}: ${resetToken}`);
 
     res.json({ message: 'If the email exists, a password reset link has been sent' });
   } catch (error) {

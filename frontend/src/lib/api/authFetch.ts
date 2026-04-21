@@ -11,7 +11,24 @@ function getCookie(name: string): string | null {
  * Set a cookie value (client-side).
  */
 function setCookie(name: string, value: string, maxAgeSeconds: number) {
-  document.cookie = `${name}=${value}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax`;
+  const isSecure = window.location.protocol === 'https:';
+  document.cookie = `${name}=${value}; path=/; max-age=${maxAgeSeconds}; SameSite=Strict${isSecure ? '; Secure' : ''}`;
+}
+
+/**
+ * Clear a cookie (client-side).
+ */
+export function clearCookie(name: string) {
+  // Try multiple approaches to clear the cookie
+  document.cookie = `${name}=; path=/; max-age=0`;
+  document.cookie = `${name}=; path=/; max-age=0; SameSite=Lax`;
+  document.cookie = `${name}=; path=/; max-age=0; SameSite=Strict`;
+  const isSecure = window.location.protocol === 'https:';
+  if (isSecure) {
+    document.cookie = `${name}=; path=/; max-age=0; Secure`;
+    document.cookie = `${name}=; path=/; max-age=0; Secure; SameSite=Lax`;
+    document.cookie = `${name}=; path=/; max-age=0; Secure; SameSite=Strict`;
+  }
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";

@@ -4,7 +4,9 @@ import {
   joinProjectViaLink,
   getProjectMembers,
   removeProjectMember,
-  updateMemberRole
+  updateMemberRole,
+  inviteUserById,
+  inviteUserByEmail
 } from '../controllers/projectMemberController';
 import { authMiddleware } from '../middleware/authMiddleware';
 
@@ -16,6 +18,10 @@ router.use(authMiddleware);
 // Link-based invite routes
 router.post('/:projectId/invites', createInviteLink);
 router.post('/join/:token', joinProjectViaLink);
+
+// Direct invite routes
+router.post('/:projectId/invite-user', inviteUserById);
+router.post('/:projectId/invite-email', inviteUserByEmail);
 
 // Member management
 router.get('/:projectId/members', getProjectMembers);

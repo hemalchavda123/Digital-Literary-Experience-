@@ -249,3 +249,176 @@ export const updateMemberRole = async (req: Request, res: Response): Promise<voi
     res.status(500).json({ error: 'Failed to update member role' });
   }
 };
+
+/**
+ * Invite user by user ID
+ * POST /api/projects/:projectId/invite-user
+ * Body: { userId, role }
+ */
+export const inviteUserById = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const currentUserId = req.user?.userId;
+    if (!currentUserId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const projectId = req.params.projectId as string;
+    const { userId, role } = req.body;
+
+    if (!userId || !role) {
+      res.status(400).json({ error: 'userId and role are required' });
+      return;
+    }
+
+    // Verify ownership
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, ownerId: currentUserId },
+    });
+
+    if (!project) {
+      res.status(404).json({ error: 'Project not found or unauthorized' });
+      return;
+    }
+
+    if (userId === currentUserId) {
+      res.status(400).json({ error: 'Cannot invite yourself' });
+      return;
+    }
+
+    // Check if user exists
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Check if already a member
+    const existingMember = await prisma.projectMember.findUnique({
+      where: {
+        projectId_userId: {
+          projectId,
+          userId,
+        },
+      },
+    });
+
+    if (existingMember) {
+      res.status(400).json({ error: 'User is already a member of this project' });
+      return;
+    }
+
+    const validRole = role === 'EDITOR' ? 'EDITOR' : 'VIEWER';
+
+    const member = await prisma.projectMember.create({
+      data: {
+        projectId,
+        userId,
+        role: validRole,
+      },
+      include: {
+        user: {
+          select: { id: true, username: true, email: true },
+        },
+      },
+    });
+
+    res.status(201).json(member);
+  } catch (error) {
+    console.error('Error inviting user by ID:', error);
+    res.status(500).json({ error: 'Failed to invite user' });
+  }
+};
+
+/**
+ * Invite user by email
+ * POST /api/projects/:projectId/invite-email
+ * Body: { email, role }
+ */
+export const inviteUserByEmail = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const currentUserId = req.user?.userId;
+    if (!currentUserId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const projectId = req.params.projectId as string;
+    const { email, role } = req.body;
+
+    if (!email || !role) {
+      res.status(400).json({ error: 'email and role are required' });
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      res.status(400).json({ error: 'Invalid email format' });
+      return;
+    }
+
+    // Verify ownership
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, ownerId: currentUserId },
+    });
+
+    if (!project) {
+      res.status(404).json({ error: 'Project not found or unauthorized' });
+      return;
+    }
+
+    // Check if user exists with this email
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+
+    if (!user) {
+      res.status(404).json({ error: 'No user found with this email' });
+      return;
+    }
+
+    if (user.id === currentUserId) {
+      res.status(400).json({ error: 'Cannot invite yourself' });
+      return;
+    }
+
+    // Check if already a member
+    const existingMember = await prisma.projectMember.findUnique({
+      where: {
+        projectId_userId: {
+          projectId,
+          userId: user.id,
+        },
+      },
+    });
+
+    if (existingMember) {
+      res.status(400).json({ error: 'User is already a member of this project' });
+      return;
+    }
+
+    const validRole = role === 'EDITOR' ? 'EDITOR' : 'VIEWER';
+
+    const member = await prisma.projectMember.create({
+      data: {
+        projectId,
+        userId: user.id,
+        role: validRole,
+      },
+      include: {
+        user: {
+          select: { id: true, username: true, email: true },
+        },
+      },
+    });
+
+    res.status(201).json(member);
+  } catch (error) {
+    console.error('Error inviting user by email:', error);
+    res.status(500).json({ error: 'Failed to invite user' });
+  }
+};

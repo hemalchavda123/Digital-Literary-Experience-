@@ -73,6 +73,12 @@ export async function forgotPassword(formData: FormData) {
 export async function logout() {
     const supabase = await createClient()
     await supabase.auth.signOut()
+    
+    // Clear custom JWT cookies
+    const cookies = await import('next/headers').then(mod => mod.cookies())
+    cookies.delete('accessToken')
+    cookies.delete('refreshToken')
+    
     revalidatePath('/', 'layout')
     redirect('/signup2')
 }

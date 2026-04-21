@@ -135,6 +135,41 @@ export const createAnnotation = async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
+    // Validate required fields
+    if (!docId || !labelId || startOffset === undefined || endOffset === undefined) {
+      return res.status(400).json({ error: 'docId, labelId, startOffset, and endOffset are required' });
+    }
+
+    // Validate docId and labelId format (UUID)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(docId)) {
+      return res.status(400).json({ error: 'Invalid docId format' });
+    }
+    if (!uuidRegex.test(labelId)) {
+      return res.status(400).json({ error: 'Invalid labelId format' });
+    }
+
+    // Validate content if provided
+    if (content !== undefined) {
+      if (typeof content !== 'string') {
+        return res.status(400).json({ error: 'Content must be a string' });
+      }
+      if (content.length > 10000) {
+        return res.status(400).json({ error: 'Content must be less than 10000 characters' });
+      }
+    }
+
+    // Validate offsets
+    if (typeof startOffset !== 'number' || typeof endOffset !== 'number') {
+      return res.status(400).json({ error: 'startOffset and endOffset must be numbers' });
+    }
+    if (startOffset < 0 || endOffset < 0) {
+      return res.status(400).json({ error: 'Offsets must be non-negative' });
+    }
+    if (startOffset >= endOffset) {
+      return res.status(400).json({ error: 'startOffset must be less than endOffset' });
+    }
+
     if (!(await ensureUserCanAccessDocOr404(docId, userId, res))) return;
 
     // Check if user can annotate (unless they're the owner)
@@ -169,6 +204,7 @@ export const createAnnotation = async (req: Request, res: Response) => {
         comments: true
       }
     });
+
     res.status(201).json(newAnnotation);
   } catch (error) {
     console.error('Error creating annotation:', error);

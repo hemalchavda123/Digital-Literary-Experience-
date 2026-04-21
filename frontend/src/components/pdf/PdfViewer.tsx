@@ -198,7 +198,9 @@ export function PdfViewer({ doc, onAnnotationClick, onTextContentChange }: Props
     setIsRendered(false)
     setHighlights([])
     const container = containerRef.current
-    container.innerHTML = ""
+    while (container.firstChild) {
+      container.removeChild(container.firstChild)
+    }
 
     const render = async () => {
       try {
@@ -290,7 +292,9 @@ export function PdfViewer({ doc, onAnnotationClick, onTextContentChange }: Props
 
     return () => {
       cancelled = true
-      container.innerHTML = ""
+      while (container.firstChild) {
+        container.removeChild(container.firstChild)
+      }
     }
   }, [doc.pdfUrl])
 

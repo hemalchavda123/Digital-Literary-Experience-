@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { X, Copy, Check, UserMinus } from "lucide-react"
-import { getProjectMembers, removeProjectMember, updateMemberRole, createInviteLink, updateMemberPermissions, updateDefaultPermissions, getProjectById } from "@/lib/api/projects"
+import { getProjectMembers, removeProjectMember, updateMemberRole, createInviteLink, updateMemberPermissions, updateDefaultPermissions, getProjectById, inviteUserById, inviteUserByEmail } from "@/lib/api/projects"
 import type { ProjectMember, Role, Project } from "@/types/project"
 
 type Props = {
@@ -25,6 +25,9 @@ export function ShareModal({ isOpen, onClose, projectId, isOwner = false }: Prop
     canAnnotate: true,
     canViewAdminAnnotations: false
   })
+  const [inviteType, setInviteType] = useState<"link" | "userId" | "email">("link")
+  const [inviteUserId, setInviteUserId] = useState("")
+  const [inviteEmail, setInviteEmail] = useState("")
 
   useEffect(() => {
     if (isOpen) {
@@ -98,6 +101,38 @@ export function ShareModal({ isOpen, onClose, projectId, isOwner = false }: Prop
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const handleInviteById = async () => {
+    try {
+      setError("")
+      if (!inviteUserId.trim()) {
+        setError("User ID is required")
+        return
+      }
+      const member = await inviteUserById(projectId, inviteUserId.trim(), inviteRole)
+      setMembers(prev => [...prev, member])
+      setInviteUserId("")
+      setInviteType("link")
+    } catch (err: any) {
+      setError(err.message || "Failed to invite user")
+    }
+  }
+
+  const handleInviteByEmail = async () => {
+    try {
+      setError("")
+      if (!inviteEmail.trim()) {
+        setError("Email is required")
+        return
+      }
+      const member = await inviteUserByEmail(projectId, inviteEmail.trim(), inviteRole)
+      setMembers(prev => [...prev, member])
+      setInviteEmail("")
+      setInviteType("link")
+    } catch (err: any) {
+      setError(err.message || "Failed to invite user")
+    }
+  }
+
   const handleRemoveMember = async (memberId: string) => {
     try {
       await removeProjectMember(projectId, memberId)
@@ -153,38 +188,124 @@ export function ShareModal({ isOpen, onClose, projectId, isOwner = false }: Prop
 
           {/* Invite Link Section */}
           <div className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium text-gray-900">Generate Shareable Link</h3>
-            <div className="flex gap-2">
-              <select
-                value={inviteRole}
-                onChange={e => setInviteRole(e.target.value as Role)}
-                className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-black"
-              >
-                <option value="VIEWER">Can View</option>
-                <option value="EDITOR">Can Edit</option>
-              </select>
+            <h3 className="text-sm font-medium text-gray-900">Invite Members</h3>
+            
+            {/* Invite Type Tabs */}
+            <div className="flex gap-2 border-b border-gray-200">
               <button
-                onClick={handleGenerateLink}
-                className="px-4 py-2 bg-black text-white text-sm font-medium rounded hover:bg-gray-800"
+                onClick={() => setInviteType("link")}
+                className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${inviteType === "link" ? "border-black text-black" : "border-transparent text-gray-500 hover:text-gray-700"}`}
               >
-                Generate Link
+                Shareable Link
+              </button>
+              <button
+                onClick={() => setInviteType("userId")}
+                className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${inviteType === "userId" ? "border-black text-black" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+              >
+                User ID
+              </button>
+              <button
+                onClick={() => setInviteType("email")}
+                className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${inviteType === "email" ? "border-black text-black" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+              >
+                Email
               </button>
             </div>
-            {inviteLink && (
-              <div className="mt-3 flex items-center gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={inviteLink}
-                  className="flex-1 bg-gray-50 border border-gray-200 rounded px-3 py-2 text-sm text-gray-700 focus:outline-none"
-                />
-                <button
-                  onClick={handleCopy}
-                  className="p-2 border border-gray-300 rounded hover:bg-gray-50"
-                  title="Copy link"
-                >
-                  {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} className="text-gray-600" />}
-                </button>
+
+            {/* Invite Link Content */}
+            {inviteType === "link" && (
+              <div className="flex flex-col gap-2 pt-2">
+                <div className="flex gap-2">
+                  <select
+                    value={inviteRole}
+                    onChange={e => setInviteRole(e.target.value as Role)}
+                    className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-black"
+                  >
+                    <option value="VIEWER">Can View</option>
+                    <option value="EDITOR">Can Edit</option>
+                  </select>
+                  <button
+                    onClick={handleGenerateLink}
+                    className="px-4 py-2 bg-black text-white text-sm font-medium rounded hover:bg-gray-800"
+                  >
+                    Generate Link
+                  </button>
+                </div>
+                {inviteLink && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={inviteLink}
+                      className="flex-1 bg-gray-50 border border-gray-200 rounded px-3 py-2 text-sm text-gray-700 focus:outline-none"
+                    />
+                    <button
+                      onClick={handleCopy}
+                      className="p-2 border border-gray-300 rounded hover:bg-gray-50"
+                      title="Copy link"
+                    >
+                      {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} className="text-gray-600" />}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Invite by User ID Content */}
+            {inviteType === "userId" && (
+              <div className="flex flex-col gap-2 pt-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={inviteUserId}
+                    onChange={e => setInviteUserId(e.target.value)}
+                    placeholder="Enter user ID"
+                    className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-black"
+                  />
+                  <select
+                    value={inviteRole}
+                    onChange={e => setInviteRole(e.target.value as Role)}
+                    className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-black"
+                  >
+                    <option value="VIEWER">Can View</option>
+                    <option value="EDITOR">Can Edit</option>
+                  </select>
+                  <button
+                    onClick={handleInviteById}
+                    className="px-4 py-2 bg-black text-white text-sm font-medium rounded hover:bg-gray-800"
+                  >
+                    Invite
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Invite by Email Content */}
+            {inviteType === "email" && (
+              <div className="flex flex-col gap-2 pt-2">
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={e => setInviteEmail(e.target.value)}
+                    placeholder="Enter email address"
+                    className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-black"
+                  />
+                  <select
+                    value={inviteRole}
+                    onChange={e => setInviteRole(e.target.value as Role)}
+                    className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-black"
+                  >
+                    <option value="VIEWER">Can View</option>
+                    <option value="EDITOR">Can Edit</option>
+                  </select>
+                  <button
+                    onClick={handleInviteByEmail}
+                    className="px-4 py-2 bg-black text-white text-sm font-medium rounded hover:bg-gray-800"
+                  >
+                    Invite
+                  </button>
+                </div>
               </div>
             )}
           </div>

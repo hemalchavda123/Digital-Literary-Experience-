@@ -91,6 +91,16 @@ export const createProject = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
+    if (typeof name !== 'string') {
+      res.status(400).json({ error: 'Project name must be a string' });
+      return;
+    }
+
+    if (name.trim().length < 1 || name.trim().length > 200) {
+      res.status(400).json({ error: 'Project name must be between 1 and 200 characters' });
+      return;
+    }
+
     const project = await prisma.project.create({
       data: {
         name: name.trim(),

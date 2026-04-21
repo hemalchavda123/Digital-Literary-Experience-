@@ -109,6 +109,46 @@ export const createDocument = async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    // Validate title length
+    if (title.length > 500) {
+      res.status(400).json({ error: 'Title must be less than 500 characters' });
+      return;
+    }
+
+    // Validate kind if provided
+    if (kind && kind !== 'text' && kind !== 'pdf') {
+      res.status(400).json({ error: 'Kind must be either "text" or "pdf"' });
+      return;
+    }
+
+    // Validate pdfUrl if provided
+    if (pdfUrl) {
+      if (typeof pdfUrl !== 'string') {
+        res.status(400).json({ error: 'pdfUrl must be a string' });
+        return;
+      }
+      
+      // If it's a data URL, validate format
+      if (pdfUrl.startsWith('data:')) {
+        if (!pdfUrl.startsWith('data:application/pdf;base64,')) {
+          res.status(400).json({ error: 'PDF data URL must be base64 encoded' });
+          return;
+        }
+      } else {
+        // If it's a regular URL, validate format
+        try {
+          const url = new URL(pdfUrl);
+          if (!['http:', 'https:'].includes(url.protocol)) {
+            res.status(400).json({ error: 'PDF URL must use HTTP or HTTPS protocol' });
+            return;
+          }
+        } catch {
+          res.status(400).json({ error: 'Invalid PDF URL format' });
+          return;
+        }
+      }
+    }
+
     // Verify project access (Owner or Editor)
     const project = await prisma.project.findFirst({
       where: {
@@ -189,6 +229,57 @@ export const updateDocument = async (req: Request, res: Response): Promise<void>
     }
 
     const { title, content, pdfUrl } = req.body;
+
+    // Validate title if provided
+    if (title !== undefined) {
+      if (typeof title !== 'string') {
+        res.status(400).json({ error: 'Title must be a string' });
+        return;
+      }
+      if (title.length > 500) {
+        res.status(400).json({ error: 'Title must be less than 500 characters' });
+        return;
+      }
+    }
+
+    // Validate content if provided
+    if (content !== undefined) {
+      if (typeof content !== 'string') {
+        res.status(400).json({ error: 'Content must be a string' });
+        return;
+      }
+    }
+
+    // Validate pdfUrl if provided
+    if (pdfUrl !== undefined) {
+      if (pdfUrl !== null) {
+        if (typeof pdfUrl !== 'string') {
+          res.status(400).json({ error: 'pdfUrl must be a string or null' });
+          return;
+        }
+        
+        // If it's a data URL, validate format
+        if (pdfUrl.startsWith('data:')) {
+          if (!pdfUrl.startsWith('data:application/pdf;base64,')) {
+            res.status(400).json({ error: 'PDF data URL must be base64 encoded' });
+            return;
+          }
+        } else {
+          // If it's a regular URL, validate format
+          try {
+            const url = new URL(pdfUrl);
+            if (!['http:', 'https:'].includes(url.protocol)) {
+              res.status(400).json({ error: 'PDF URL must use HTTP or HTTPS protocol' });
+              return;
+            }
+          } catch {
+            res.status(400).json({ error: 'Invalid PDF URL format' });
+            return;
+          }
+        }
+      }
+    }
+
     const data: Record<string, unknown> = {};
     if (title !== undefined) data.title = title.trim();
     if (content !== undefined) data.content = content;

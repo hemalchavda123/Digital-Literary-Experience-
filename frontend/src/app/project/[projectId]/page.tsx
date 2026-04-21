@@ -21,10 +21,27 @@ export default function ProjectPage() {
   const [docsLoaded, setDocsLoaded] = useState(false)
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
   const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [authChecked, setAuthChecked] = useState(false)
 
   useEffect(() => {
-    getCurrentUser().then(user => setCurrentUser(user))
-  }, [])
+    async function checkAuth() {
+      try {
+        const user = await getCurrentUser()
+        if (!user) {
+          router.replace("/signup2")
+        } else {
+          setCurrentUser(user)
+          setIsAuthenticated(true)
+        }
+      } catch (error) {
+        router.replace("/signup2")
+      } finally {
+        setAuthChecked(true)
+      }
+    }
+    checkAuth()
+  }, [router])
 
   // Fetch documents when the project page loads
   useEffect(() => {
@@ -37,6 +54,22 @@ export default function ProjectPage() {
   useEffect(() => {
     if (project) setName(project.name)
   }, [project])
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen w-full flex flex-col bg-white">
+        <Navbar />
+        <main className="flex-1 flex items-center justify-center">
+          <p className="text-sm text-gray-500">Loading…</p>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return null
+  }
 
   if (loading) {
     return (

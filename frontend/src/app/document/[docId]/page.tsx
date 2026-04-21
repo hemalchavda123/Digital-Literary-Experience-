@@ -45,10 +45,22 @@ export default function DocumentPage() {
     return () => { cancelled = true }
   }, [params.docId, getDocumentById])
 
-  // Fetch current user
+  // Fetch current user and check auth
   useEffect(() => {
-    getCurrentUser().then(user => setCurrentUser(user))
-  }, [])
+    async function checkAuth() {
+      try {
+        const user = await getCurrentUser()
+        if (!user) {
+          router.replace("/signup2")
+        } else {
+          setCurrentUser(user)
+        }
+      } catch (error) {
+        router.replace("/signup2")
+      }
+    }
+    checkAuth()
+  }, [router])
 
   // Fetch labels and annotations once doc is loaded
   useEffect(() => {

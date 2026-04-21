@@ -148,6 +148,26 @@ export async function joinProjectViaLink(token: string) {
   return res.json();
 }
 
+export async function inviteUserById(projectId: string, userId: string, role: string) {
+  const res = await authFetch(`${API_BASE_URL}/projects/${projectId}/invite-user`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, role }),
+  });
+  if (!res.ok) throw new Error(await extractError(res, "Failed to invite user"));
+  return res.json();
+}
+
+export async function inviteUserByEmail(projectId: string, email: string, role: string) {
+  const res = await authFetch(`${API_BASE_URL}/projects/${projectId}/invite-email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, role }),
+  });
+  if (!res.ok) throw new Error(await extractError(res, "Failed to invite user"));
+  return res.json();
+}
+
 export async function updateMemberPermissions(
   projectId: string,
   userId: string,
