@@ -1,7 +1,7 @@
 "use client"
 
 import { useParams, useRouter } from "next/navigation"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useProjects } from "@/context/ProjectContext"
 import { useAnnotations } from "@/context/AnnotationContext"
 import { AnnotatableText } from "@/components/document/AnnotatableText"
@@ -12,6 +12,7 @@ import { TextAnnotation } from "@/types/annotation"
 import type { Document } from "@/types/document"
 import dynamic from "next/dynamic"
 import { getCurrentUser } from "@/lib/api/authFetch"
+import { Filter, X as CloseIcon } from "lucide-react"
 
 const PdfViewer = dynamic(() => import("@/components/pdf/PdfViewer").then(mod => mod.PdfViewer), { ssr: false })
 
@@ -19,7 +20,7 @@ export default function DocumentPage() {
   const params = useParams<{ docId: string }>()
   const router = useRouter()
   const { getDocumentById, renameDocument, deleteDocument, getProjectById } = useProjects()
-  const { fetchLabels, fetchAnnotations } = useAnnotations()
+  const { labels, annotations, fetchLabels, fetchAnnotations } = useAnnotations()
   const [doc, setDoc] = useState<Document | null>(null)
   const [docLoading, setDocLoading] = useState(true)
   const [title, setTitle] = useState("")
@@ -28,6 +29,29 @@ export default function DocumentPage() {
   const [pdfTextContent, setPdfTextContent] = useState<string | null>(null)
   const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false)
   const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null)
+  const [showFilters, setShowFilters] = useState(false)
+  const [filters, setFilters] = useState<{ userId: string | null; labelId: string | null }>({ userId: null, labelId: null })
+
+  // Get unique users from annotations for the person filter
+  const uniqueUsers = useMemo(() => {
+    const users = new Map<string, { id: string; username: string }>()
+    annotations.forEach(ann => {
+      if (ann.user && ann.userId && !users.has(ann.userId)) {
+        const username = ann.user.username || "Unknown"
+        users.set(ann.userId, { id: ann.userId, username })
+      }
+    })
+    return Array.from(users.values())
+  }, [annotations])
+
+  // Filter annotations based on selected filters
+  const filteredAnnotations = useMemo(() => {
+    return annotations.filter((ann) => {
+      if (filters.userId && ann.userId !== filters.userId) return false
+      if (filters.labelId && ann.labelId !== filters.labelId) return false
+      return true
+    })
+  }, [annotations, filters])
 
   // Fetch document from backend on mount
   useEffect(() => {
@@ -129,47 +153,110 @@ export default function DocumentPage() {
   return (
     <div className="h-screen w-full flex flex-col bg-white">
       {/* Document viewer navbar */}
-      <header className="h-12 border-b border-gray-200 flex items-center justify-between px-4 text-sm bg-white">
-        <div className="flex items-center gap-3 min-w-0">
-          <button
-            type="button"
-            onClick={() => router.push(`/project/${doc.projectId}`)}
-            className="text-gray-900 hover:text-black"
-          >
-            ←
-          </button>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onBlur={handleTitleBlur}
-            className="min-w-0 flex-1 border-none bg-transparent text-sm font-medium text-gray-900 focus:outline-none"
-          />
-        </div>
-        <div className="flex items-center gap-3 text-xs text-gray-900">
-          <button
-            type="button"
-            onClick={() => setShowLabelManager(true)}
-            className="rounded border border-gray-300 px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50"
-          >
-            Manage Labels
-          </button>
-          {isOwner && (
+      <header className="border-b border-gray-200 bg-white">
+        <div className="h-12 flex items-center justify-between px-4 text-sm">
+          <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
-              onClick={() => setIsPermissionsModalOpen(true)}
+              onClick={() => router.push(`/project/${doc.projectId}`)}
+              className="text-gray-900 hover:text-black"
+            >
+              ←
+            </button>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={handleTitleBlur}
+              className="min-w-0 flex-1 border-none bg-transparent text-sm font-medium text-gray-900 focus:outline-none"
+            />
+          </div>
+          <div className="flex items-center gap-3 text-xs text-gray-900">
+            <button
+              type="button"
+              onClick={() => setShowLabelManager(true)}
               className="rounded border border-gray-300 px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50"
             >
-              Permissions
+              Manage Labels
             </button>
-          )}
+            {isOwner && (
+              <button
+                type="button"
+                onClick={() => setIsPermissionsModalOpen(true)}
+                className="rounded border border-gray-300 px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Permissions
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleDelete}
+              className="rounded border border-red-300 px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+
+        {/* Filter bar */}
+        <div className="px-4 py-2 border-t border-gray-100 bg-gray-50">
           <button
-            type="button"
-            onClick={handleDelete}
-            className="rounded border border-red-300 px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50"
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900"
           >
-            Delete
+            <Filter size={14} />
+            <span>Filters</span>
+            {(filters.userId || filters.labelId) && (
+              <span className="bg-black text-white text-xs px-1.5 py-0.5 rounded">Active</span>
+            )}
           </button>
+          
+          {showFilters && (
+            <div className="flex gap-4 mt-2">
+              {/* Filter by Person */}
+              <div>
+                <label className="text-xs text-gray-600 mb-1 block">Filter by person</label>
+                <select
+                  value={filters.userId || ""}
+                  onChange={(e) => setFilters({ ...filters, userId: e.target.value || null })}
+                  className="border border-gray-300 rounded px-2 py-1 text-xs text-gray-900 focus:outline-none focus:border-black"
+                >
+                  <option value="">All users</option>
+                  {uniqueUsers.map(user => (
+                    <option key={user.id} value={user.id}>{user.username}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filter by Label */}
+              <div>
+                <label className="text-xs text-gray-600 mb-1 block">Filter by label</label>
+                <select
+                  value={filters.labelId || ""}
+                  onChange={(e) => setFilters({ ...filters, labelId: e.target.value || null })}
+                  className="border border-gray-300 rounded px-2 py-1 text-xs text-gray-900 focus:outline-none focus:border-black"
+                >
+                  <option value="">All labels</option>
+                  {labels.map(label => (
+                    <option key={label.id} value={label.id}>{label.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Clear Filters */}
+              {(filters.userId || filters.labelId) && (
+                <div className="flex items-end">
+                  <button
+                    onClick={() => setFilters({ userId: null, labelId: null })}
+                    className="text-xs text-gray-600 hover:text-gray-900 flex items-center gap-1 px-2 py-1"
+                  >
+                    <CloseIcon size={12} />
+                    Clear filters
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
@@ -187,6 +274,7 @@ export default function DocumentPage() {
                     doc={{ ...doc, pdfUrl: pdfSource }}
                     onTextContentChange={setPdfTextContent}
                     onAnnotationClick={(anns) => setSelectedAnnotations(anns)}
+                    filteredAnnotations={filteredAnnotations}
                   />
                 </div>
               </div>
@@ -201,6 +289,7 @@ export default function DocumentPage() {
                       text={doc.content}
                       docId={doc.id}
                       onAnnotationClick={(anns) => setSelectedAnnotations(anns)}
+                      filteredAnnotations={filteredAnnotations}
                     />
                   ) : (
                     "This document is currently empty."

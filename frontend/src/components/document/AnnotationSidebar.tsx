@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { TextAnnotation } from "@/types/annotation"
 import { useAnnotations } from "@/context/AnnotationContext"
-import { Trash2, Edit2, Check, X, Send, MessageSquareText } from "lucide-react"
+import { Trash2, Edit2, Check, X, Send, MessageSquareText, Filter, X as CloseIcon } from "lucide-react"
 
 type Props = {
   selectedAnnotations: TextAnnotation[]
@@ -12,15 +12,28 @@ type Props = {
 }
 
 export function AnnotationSidebar({ selectedAnnotations, onClose, documentText }: Props) {
-  const { labels, annotations, editAnnotation, removeAnnotation, addComment, removeComment } = useAnnotations()
+  const { labels, annotations, filteredAnnotations, filters, setFilters, clearFilters, editAnnotation, removeAnnotation, addComment, removeComment } = useAnnotations()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editContent, setEditContent] = useState("")
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({})
+  const [showFilters, setShowFilters] = useState(false)
+
+  // Get unique users from annotations for the person filter
+  const uniqueUsers = useMemo(() => {
+    const users = new Map<string, { id: string; username: string }>()
+    annotations.forEach(ann => {
+      if (ann.user && ann.userId && !users.has(ann.userId)) {
+        const username = ann.user.username || "Unknown"
+        users.set(ann.userId, { id: ann.userId, username })
+      }
+    })
+    return Array.from(users.values())
+  }, [annotations])
 
   // `selectedAnnotations` may be derived from a parent snapshot. Resolve to the latest
   // annotation objects in context so replies update instantly.
   const resolvedSelected = selectedAnnotations
-    .map((a) => annotations.find((x) => x.id === a.id))
+    .map((a) => filteredAnnotations.find((x) => x.id === a.id))
     .filter((a): a is TextAnnotation => !!a)
 
   // If the selected annotations were deleted, auto-close the sidebar.
@@ -85,6 +98,65 @@ export function AnnotationSidebar({ selectedAnnotations, onClose, documentText }
         <button onClick={onClose} className="text-gray-900 hover:text-black">
           <X size={16} />
         </button>
+      </div>
+
+      {/* Filter Section */}
+      <div className="px-4 py-3 border-b border-gray-100">
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900 mb-2"
+        >
+          <Filter size={14} />
+          <span>Filters</span>
+          {(filters.userId || filters.labelId) && (
+            <span className="bg-black text-white text-xs px-1.5 py-0.5 rounded">Active</span>
+          )}
+        </button>
+        
+        {showFilters && (
+          <div className="space-y-3">
+            {/* Filter by Person */}
+            <div>
+              <label className="text-xs text-gray-600 mb-1 block">Filter by person</label>
+              <select
+                value={filters.userId || ""}
+                onChange={(e) => setFilters({ ...filters, userId: e.target.value || null })}
+                className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs text-gray-900 focus:outline-none focus:border-black"
+              >
+                <option value="">All users</option>
+                {uniqueUsers.map(user => (
+                  <option key={user.id} value={user.id}>{user.username}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Filter by Label */}
+            <div>
+              <label className="text-xs text-gray-600 mb-1 block">Filter by label</label>
+              <select
+                value={filters.labelId || ""}
+                onChange={(e) => setFilters({ ...filters, labelId: e.target.value || null })}
+                className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs text-gray-900 focus:outline-none focus:border-black"
+              >
+                <option value="">All labels</option>
+                {labels.map(label => (
+                  <option key={label.id} value={label.id}>{label.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Clear Filters */}
+            {(filters.userId || filters.labelId) && (
+              <button
+                onClick={clearFilters}
+                className="text-xs text-gray-600 hover:text-gray-900 flex items-center gap-1"
+              >
+                <CloseIcon size={12} />
+                Clear filters
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">

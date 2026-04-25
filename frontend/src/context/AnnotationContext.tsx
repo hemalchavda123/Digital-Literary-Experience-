@@ -11,8 +11,15 @@ type CommentDeletedEvent = { annotationId: string; commentId: string }
 type AnnotationContextValue = {
   labels: AnnotationLabel[]
   annotations: TextAnnotation[]
+  filteredAnnotations: TextAnnotation[]
   loading: boolean
   error: string | null
+  filters: {
+    userId: string | null
+    labelId: string | null
+  }
+  setFilters: (filters: { userId: string | null; labelId: string | null }) => void
+  clearFilters: () => void
   fetchLabels: (projectId: string) => Promise<void>
   fetchAnnotations: (docId: string) => Promise<void>
   addLabel: (projectId: string, name: string, color: string) => Promise<void>
@@ -39,11 +46,28 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
   const [loading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeDocId, setActiveDocId] = useState<string | null>(null)
+  const [filters, setFiltersState] = useState<{ userId: string | null; labelId: string | null }>({ userId: null, labelId: null })
   const sseRef = useRef<EventSource | null>(null)
 
   const API_BASE_URL = useMemo(() => {
     return process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
   }, [])
+
+  const setFilters = (newFilters: { userId: string | null; labelId: string | null }) => {
+    setFiltersState(newFilters)
+  }
+
+  const clearFilters = () => {
+    setFiltersState({ userId: null, labelId: null })
+  }
+
+  const filteredAnnotations = useMemo(() => {
+    return annotations.filter((ann) => {
+      if (filters.userId && ann.userId !== filters.userId) return false
+      if (filters.labelId && ann.labelId !== filters.labelId) return false
+      return true
+    })
+  }, [annotations, filters])
 
   const fetchLabels = useCallback(async (projectId: string) => {
     try {
@@ -281,8 +305,12 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
       value={{
         labels,
         annotations,
+        filteredAnnotations,
         loading,
         error,
+        filters,
+        setFilters,
+        clearFilters,
         fetchLabels,
         fetchAnnotations,
         addLabel,

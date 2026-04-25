@@ -7,11 +7,13 @@ import { useAnnotations } from "@/context/AnnotationContext"
 import * as pdfjsLib from "pdfjs-dist"
 import { TextLayer } from "pdfjs-dist"
 import "pdfjs-dist/web/pdf_viewer.css"
+import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react'
 
 type Props = {
   doc: AppDocument
   onAnnotationClick?: (annotations: TextAnnotation[]) => void
   onTextContentChange?: (text: string) => void
+  filteredAnnotations?: TextAnnotation[]
 }
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs`
@@ -60,13 +62,37 @@ function buildStripedBackground(colors: string[]) {
   return { backgroundImage: `linear-gradient(90deg, ${stops})` }
 }
 
-export function PdfViewer({ doc, onAnnotationClick, onTextContentChange }: Props) {
-  const containerRef = useRef<HTMLDivElement | null>(null)
+export function PdfViewer({ doc, onAnnotationClick, onTextContentChange, filteredAnnotations }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
   const [isRendered, setIsRendered] = useState(false)
-  const { annotations, labels, addAnnotation } = useAnnotations()
+  const { annotations: contextAnnotations, labels, addAnnotation } = useAnnotations()
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; start: number; end: number } | null>(null)
   const [highlights, setHighlights] = useState<HighlightBox[]>([])
+  const [zoom, setZoom] = useState(1.3)
+  const [zoomInput, setZoomInput] = useState(Math.round(1.3 * 100).toString())
+
+  const annotations = filteredAnnotations || contextAnnotations
+
+  const handleZoomChange = (value: string) => {
+    setZoomInput(value)
+    const numValue = parseFloat(value)
+    if (!isNaN(numValue)) {
+      const newZoom = Math.max(0.6, Math.min(3, numValue / 100))
+      setZoom(newZoom)
+    }
+  }
+
+  const handleZoomBlur = () => {
+    const numValue = parseFloat(zoomInput)
+    if (!isNaN(numValue)) {
+      const clamped = Math.max(60, Math.min(300, numValue))
+      setZoomInput(clamped.toString())
+      setZoom(clamped / 100)
+    } else {
+      setZoomInput(Math.round(zoom * 100).toString())
+    }
+  }
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -165,10 +191,10 @@ export function PdfViewer({ doc, onAnnotationClick, onTextContentChange }: Props
       for (let i = 0; i < rects.length; i++) {
         const rect = rects[i]
         raw.push({
-          top: rect.top - containerRect.top,
-          left: rect.left - containerRect.left,
-          width: rect.width,
-          height: rect.height,
+          top: (rect.top - containerRect.top) / zoom,
+          left: (rect.left - containerRect.left) / zoom,
+          width: rect.width / zoom,
+          height: rect.height / zoom,
           annotationIds: [ann.id]
         })
       }
@@ -189,7 +215,7 @@ export function PdfViewer({ doc, onAnnotationClick, onTextContentChange }: Props
     }
 
     setHighlights(merged)
-  }, [annotations, isRendered, labels])
+  }, [annotations, isRendered, labels, zoom])
 
   useEffect(() => {
     if (!doc.pdfUrl || !containerRef.current) return
@@ -198,9 +224,7 @@ export function PdfViewer({ doc, onAnnotationClick, onTextContentChange }: Props
     setIsRendered(false)
     setHighlights([])
     const container = containerRef.current
-    while (container.firstChild) {
-      container.removeChild(container.firstChild)
-    }
+    container.innerHTML = ''
 
     const render = async () => {
       try {
@@ -223,7 +247,7 @@ export function PdfViewer({ doc, onAnnotationClick, onTextContentChange }: Props
         for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
           if (cancelled) break
           const page = await pdf.getPage(pageNum)
-          const viewport = page.getViewport({ scale: 1.3 })
+          const viewport = page.getViewport({ scale: 1.5 })
 
           // Page wrapper — positions canvas and text layer together
           const pageDiv = document.createElement("div")
@@ -280,10 +304,9 @@ export function PdfViewer({ doc, onAnnotationClick, onTextContentChange }: Props
           if (doc.pdfUrl && doc.pdfUrl.startsWith('blob:')) {
             setError("This mock PDF is no longer available in memory after a page reload. Please upload it again or create a new document.")
           } else {
-            setError("Failed to render PDF.")
+            // Use console.warn instead of console.error to prevent Next.js full-screen dev overlay
+            console.warn("PDF rendering error:", e)
           }
-          // Use console.warn instead of console.error to prevent Next.js full-screen dev overlay
-          console.warn("PDF rendering error:", e)
         }
       }
     }
@@ -292,11 +315,13 @@ export function PdfViewer({ doc, onAnnotationClick, onTextContentChange }: Props
 
     return () => {
       cancelled = true
-      while (container.firstChild) {
-        container.removeChild(container.firstChild)
+      if (containerRef.current) {
+        while (containerRef.current.firstChild) {
+          containerRef.current.removeChild(containerRef.current.firstChild)
+        }
       }
     }
-  }, [doc.pdfUrl])
+  }, [doc.id])
 
   if (!doc.pdfUrl) {
     return <p className="text-sm text-gray-900 mt-4">No PDF data available.</p>
@@ -309,13 +334,14 @@ export function PdfViewer({ doc, onAnnotationClick, onTextContentChange }: Props
   const handleContainerMouseDown = (e: React.MouseEvent) => {
     if (!onAnnotationClick || !containerRef.current) return
     
-    const containerRect = containerRef.current.getBoundingClientRect()
-    const scrollContainer = containerRef.current.closest('.overflow-auto') as HTMLElement
+    const wrapper = containerRef.current.parentElement as HTMLElement
+    const wrapperRect = wrapper.getBoundingClientRect()
+    const scrollContainer = wrapper.closest('.overflow-auto') as HTMLElement
     const scrollTop = scrollContainer ? scrollContainer.scrollTop : 0
     const scrollLeft = scrollContainer ? scrollContainer.scrollLeft : 0
     
-    const x = e.clientX - containerRect.left + scrollLeft
-    const y = e.clientY - containerRect.top + scrollTop
+    const x = e.clientX - wrapperRect.left + scrollLeft
+    const y = e.clientY - wrapperRect.top + scrollTop
     
     // Collect all annotations from all highlight boxes that contain the click
     const clickedAnnotationIds = new Set<string>()
@@ -338,8 +364,77 @@ export function PdfViewer({ doc, onAnnotationClick, onTextContentChange }: Props
       onContextMenu={handleContextMenu}
       onMouseDown={handleContainerMouseDown}
     >
-      <div className="relative mx-auto w-max">
-        <div ref={containerRef} />
+      <style>{`
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+          -webkit-appearance: none !important;
+          margin: 0 !important;
+        }
+        input[type="number"] {
+          -moz-appearance: textfield !important;
+        }
+      `}</style>
+      {/* Zoom Controls */}
+      <div className="fixed bottom-6 right-6 flex items-center gap-2 bg-white rounded-lg shadow-lg border border-gray-200 p-2 z-50">
+        <button
+          onClick={() => {
+            const newZoom = Math.max(0.6, zoom - 0.1)
+            setZoom(newZoom)
+            setZoomInput(Math.round(newZoom * 100).toString())
+          }}
+          className="p-2 hover:bg-gray-100 rounded text-gray-700"
+          title="Zoom Out"
+        >
+          <ZoomOut size={18} />
+        </button>
+        <input
+          type="number"
+          min="60"
+          max="300"
+          autoComplete="off"
+          value={zoomInput}
+          onChange={(e) => handleZoomChange(e.target.value)}
+          onBlur={handleZoomBlur}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              handleZoomBlur()
+              e.currentTarget.blur()
+            }
+          }}
+          className="w-16 text-xs font-medium text-gray-700 text-center border border-gray-300 rounded px-2 py-1"
+          style={{
+            WebkitAppearance: 'none',
+            MozAppearance: 'textfield',
+            appearance: 'none'
+          }}
+        />
+        <span className="text-xs font-medium text-gray-700">%</span>
+        <button
+          onClick={() => {
+            const newZoom = Math.min(3, zoom + 0.1)
+            setZoom(newZoom)
+            setZoomInput(Math.round(newZoom * 100).toString())
+          }}
+          className="p-2 hover:bg-gray-100 rounded text-gray-700"
+          title="Zoom In"
+        >
+          <ZoomIn size={18} />
+        </button>
+        <button
+          onClick={() => {
+            setZoom(1.3)
+            setZoomInput("130")
+          }}
+          className="p-2 hover:bg-gray-100 rounded text-gray-700"
+          title="Reset Zoom"
+        >
+          <RotateCcw size={18} />
+        </button>
+      </div>
+
+      <div className="overflow-auto w-full">
+        <div className="relative mx-auto w-max" style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
+          <div ref={containerRef} />
 
         {/* Render Highlights Overlay */}
         {isRendered && highlights.map((h, i) => (
@@ -358,10 +453,15 @@ export function PdfViewer({ doc, onAnnotationClick, onTextContentChange }: Props
                   .filter((c): c is string => !!c)
               )),
               zIndex: 10,
-              pointerEvents: 'none'
+              cursor: 'pointer'
+            }}
+            onClick={() => {
+              const clickedAnns = annotations.filter(a => h.annotationIds.includes(a.id))
+              onAnnotationClick(clickedAnns)
             }}
           />
         ))}
+        </div>
       </div>
 
       {contextMenu && (

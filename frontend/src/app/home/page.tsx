@@ -22,7 +22,7 @@ function sortProjects(projects: ReturnType<typeof useProjects>["projects"], filt
 
 export default function HomePage() {
   const router = useRouter()
-  const { projects, loading } = useProjects()
+  const { projects, loading, refreshProjects } = useProjects()
   const [searchQuery, setSearchQuery] = useState("")
   const [filter, setFilter] = useState<"all" | "recent" | "alphabetical">("all")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -40,6 +40,8 @@ export default function HomePage() {
           return
         }
         setIsAuthenticated(true)
+        // Refresh projects after auth is confirmed
+        refreshProjects()
       } catch (error) {
         window.location.href = "/signup2"
         return

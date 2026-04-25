@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useMemo, useState, useCallback, ReactNode } from "react"
+import { createContext, useContext, useEffect, useMemo, useState, useCallback, ReactNode, useRef } from "react"
 import type { Project } from "@/types/project"
 import type { Document } from "@/types/document"
 import * as api from "@/lib/api/projects"
@@ -37,6 +37,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [documentCache, setDocumentCache] = useState<Record<string, Document[]>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const tokenRef = useRef<string | null>(null)
 
   const refreshProjects = useCallback(async () => {
     try {
@@ -73,10 +74,15 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     const token = getCookie("accessToken")
     if (!token) {
       setLoading(false)
+      tokenRef.current = null
       return
     }
 
-    refreshProjects()
+    // Only refresh if token changed from null to having a value
+    if (tokenRef.current === null) {
+      tokenRef.current = token
+      refreshProjects()
+    }
   }, [refreshProjects])
 
   const contextValue: ProjectContextValue = useMemo(() => ({
