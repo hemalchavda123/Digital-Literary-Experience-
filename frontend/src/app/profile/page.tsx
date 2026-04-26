@@ -85,7 +85,8 @@ export default function ProfilePage() {
         <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
           {/* Header/Cover Area */}
-          <div className="h-32 bg-black w-full"></div>
+                    <div className="h-32 bg-[#a17038] w-full"></div>
+
           
           <div className="px-6 pb-8">
             <div className="relative -mt-16 flex items-end space-x-5">
