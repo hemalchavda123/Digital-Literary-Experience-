@@ -40,6 +40,15 @@ export default function ProfilePage() {
     // Limit size to 2MB for base64 storage
     if (file.size > 2 * 1024 * 1024) {
       alert("Image is too large. Please select an image smaller than 2MB.")
+      // Reset the file input so the same file can be selected again
+      event.target.value = ''
+      return
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert("Please select a valid image file.")
+      event.target.value = ''
       return
     }
 
@@ -47,19 +56,36 @@ export default function ProfilePage() {
     try {
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
-        reader.onload = () => resolve(reader.result as string)
-        reader.onerror = reject
+        reader.onload = () => {
+          const result = reader.result as string
+          // Validate that we got a proper data URL
+          if (!result || !result.startsWith('data:image/')) {
+            reject(new Error('Invalid image data'))
+            return
+          }
+          resolve(result)
+        }
+        reader.onerror = () => reject(new Error('Failed to read file'))
         reader.readAsDataURL(file)
       })
 
+      console.log('Uploading image, data URL length:', base64.length)
       const response = await updateProfileImage(base64)
-      setUser(response.user)
-      // Page reload removed to avoid refresh loop; state update is sufficient
-    } catch (err) {
+      console.log('Upload response:', response)
+      
+      if (response.user) {
+        setUser(response.user)
+        alert('Profile image updated successfully!')
+      } else {
+        throw new Error('Invalid response from server')
+      }
+    } catch (err: any) {
       console.error("Failed to upload image:", err)
-      alert("Failed to upload profile image.")
+      alert(`Failed to upload profile image: ${err.message || 'Unknown error'}`)
     } finally {
       setIsUploading(false)
+      // Reset the file input
+      event.target.value = ''
     }
   }
 
