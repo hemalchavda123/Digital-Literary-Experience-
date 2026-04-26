@@ -34,7 +34,7 @@ export function DocumentList({ documents }: Props) {
               className="block"
             >
               <div className="font-medium text-sm text-gray-900">{doc.title}</div>
-              <div className="text-xs text-gray-900 truncate">{doc.content || "Empty document"}</div>
+             {/* <div className="text-xs text-gray-900 truncate">{doc.content || "Empty document"}</div> */}
             </Link>
           </div>
           <button

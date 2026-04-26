@@ -14,6 +14,8 @@ type Props = {
   onAnnotationClick?: (annotations: TextAnnotation[]) => void
   onTextContentChange?: (text: string) => void
   filteredAnnotations?: TextAnnotation[]
+  containerRef?: React.RefObject<HTMLDivElement | null>
+  hoveredAnnotationId?: string | null
 }
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs`
@@ -44,28 +46,41 @@ function mergeBoxes(a: HighlightBox, b: HighlightBox): HighlightBox {
 }
 
 function buildStripedBackground(colors: string[]) {
-  const unique = Array.from(new Set(colors)).filter(Boolean)
-  const max = 5
-  const used = unique.slice(0, max)
-  const extra = unique.length - used.length
-  const finalColors = extra > 0 ? [...used.slice(0, Math.max(1, used.length - 1)), "#e5e7eb"] : used
-  if (finalColors.length === 1) return { backgroundColor: finalColors[0] }
-
-  const step = 100 / finalColors.length
-  const stops = finalColors
-    .map((c, idx) => {
-      const from = idx * step
-      const to = (idx + 1) * step
-      return `${c} ${from}%, ${c} ${to}%`
-    })
+  if (colors.length === 0) return { backgroundColor: "#fbbf24", opacity: 0.5 }
+  const step = 100 / colors.length
+  const stops = colors.map((c, idx) => {
+    const from = idx * step
+    const to = (idx + 1) * step
+    return `${c} ${from}%, ${c} ${to}%`
+  })
     .join(", ")
   return { backgroundImage: `linear-gradient(90deg, ${stops})` }
 }
 
-export function PdfViewer({ doc, onAnnotationClick, onTextContentChange, filteredAnnotations }: Props) {
+const extractTextContent = (node: Node): string => {
+  // Use the same TreeWalker approach as getRangeForOffsets
+  // to ensure text extraction matches offset calculation
+  let text = ''
+  const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null)
+  let textNode = walker.nextNode()
+  while (textNode) {
+    text += textNode.nodeValue || ''
+    textNode = walker.nextNode()
+  }
+  return text
+}
+
+export function PdfViewer({ doc, onAnnotationClick, onTextContentChange, filteredAnnotations, containerRef: externalContainerRef, hoveredAnnotationId }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const setContainerRef = (node: HTMLDivElement | null) => {
+    containerRef.current = node
+    if (externalContainerRef) {
+      (externalContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = node
+    }
+  }
   const [error, setError] = useState<string | null>(null)
   const [isRendered, setIsRendered] = useState(false)
+  const [naturalPdfWidth, setNaturalPdfWidth] = useState(0)
   const { annotations: contextAnnotations, labels, addAnnotation } = useAnnotations()
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; start: number; end: number } | null>(null)
   const [highlights, setHighlights] = useState<HighlightBox[]>([])
@@ -290,22 +305,26 @@ export function PdfViewer({ doc, onAnnotationClick, onTextContentChange, filtere
             container: textLayerDiv,
             viewport,
           })
-          await textLayer.render()
+          textLayer.render()
         }
-        if (!cancelled) {
-          setIsRendered(true)
-          // Extract text from DOM after rendering to match annotation offsets
-          if (onTextContentChange && container.textContent) {
-            onTextContentChange(container.textContent)
-          }
+        setIsRendered(true)
+        // Capture the natural PDF width for zoom calculations
+        if (containerRef.current) {
+          setNaturalPdfWidth(containerRef.current.offsetWidth)
         }
-      } catch (e: any) {
+        // Extract text from the same container used by getRangeForOffsets
+        // This ensures text extraction matches offset calculation exactly
+        if (containerRef.current && onTextContentChange) {
+          const text = extractTextContent(containerRef.current)
+          onTextContentChange(text)
+        }
+      } catch (err) {
         if (!cancelled) {
           if (doc.pdfUrl && doc.pdfUrl.startsWith('blob:')) {
             setError("This mock PDF is no longer available in memory after a page reload. Please upload it again or create a new document.")
           } else {
             // Use console.warn instead of console.error to prevent Next.js full-screen dev overlay
-            console.warn("PDF rendering error:", e)
+            console.warn("PDF rendering error:", err)
           }
         }
       }
@@ -360,7 +379,7 @@ export function PdfViewer({ doc, onAnnotationClick, onTextContentChange, filtere
 
   return (
     <div 
-      className="w-full h-full overflow-auto bg-gray-100 px-6 py-8"
+      className="w-full h-full bg-white"
       onContextMenu={handleContextMenu}
       onMouseDown={handleContainerMouseDown}
     >
@@ -432,35 +451,44 @@ export function PdfViewer({ doc, onAnnotationClick, onTextContentChange, filtere
         </button>
       </div>
 
-      <div className="overflow-auto w-full">
-        <div className="relative mx-auto w-max" style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
-          <div ref={containerRef} />
+      <div className="w-full">
+        <div 
+          className="relative mx-auto w-max" 
+          style={{ 
+            transform: `scale(${zoom})`, 
+            transformOrigin: 'top center'
+          }}
+        >
+          <div ref={setContainerRef} />
 
-        {/* Render Highlights Overlay */}
-        {isRendered && highlights.map((h, i) => (
-          <div
-            key={i}
-            className="absolute transition-colors hover:brightness-95 mix-blend-multiply opacity-50"
-            style={{
-              top: h.top,
-              left: h.left,
-              width: h.width,
-              height: h.height,
-              ...(buildStripedBackground(
-                h.annotationIds
-                  .map((id) => annotations.find((a) => a.id === id))
-                  .map((a) => labels.find((l) => l.id === a?.labelId)?.color)
-                  .filter((c): c is string => !!c)
-              )),
-              zIndex: 10,
-              cursor: 'pointer'
-            }}
-            onClick={() => {
-              const clickedAnns = annotations.filter(a => h.annotationIds.includes(a.id))
-              onAnnotationClick(clickedAnns)
-            }}
-          />
-        ))}
+        {/* Render Highlights Overlay - inside transformed div */}
+        {isRendered && highlights.map((h, i) => {
+          const isHovered = h.annotationIds.includes(hoveredAnnotationId || '')
+          return (
+            <div
+              key={i}
+              className={`absolute transition-colors hover:brightness-95 mix-blend-multiply ${isHovered ? 'opacity-100 border-2 border-black' : 'opacity-50'}`}
+              style={{
+                top: h.top,
+                left: h.left,
+                width: h.width,
+                height: h.height,
+                ...(buildStripedBackground(
+                  h.annotationIds
+                    .map((id) => annotations.find((a) => a.id === id))
+                    .map((a) => labels.find((l) => l.id === a?.labelId)?.color)
+                    .filter((c): c is string => !!c)
+                )),
+                zIndex: 10,
+                cursor: 'pointer'
+              }}
+              onClick={() => {
+                const clickedAnns = annotations.filter(a => h.annotationIds.includes(a.id))
+                onAnnotationClick?.(clickedAnns)
+              }}
+            />
+          )
+        })}
         </div>
       </div>
 
