@@ -8,6 +8,7 @@ type Props = {
   text: string
   docId: string
   onAnnotationClick: (annotations: TextAnnotation[]) => void
+  filteredAnnotations?: TextAnnotation[]
 }
 
 type Segment = {
@@ -45,10 +46,13 @@ function buildStripedBackground(colors: string[]) {
   return `linear-gradient(90deg, ${stops})`
 }
 
-export function AnnotatableText({ text, docId, onAnnotationClick }: Props) {
-  const { annotations, labels, addAnnotation } = useAnnotations()
+export function AnnotatableText({ text, docId, onAnnotationClick, filteredAnnotations }: Props) {
+  const { annotations: contextAnnotations, labels, addAnnotation } = useAnnotations()
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; start: number; end: number } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // Use filtered annotations if provided, otherwise use all annotations from context
+  const annotations = filteredAnnotations || contextAnnotations
 
   // Segment the text to handle overlapping annotations
   const segments = (): Segment[] => {
