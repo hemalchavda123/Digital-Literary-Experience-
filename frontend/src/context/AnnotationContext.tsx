@@ -100,7 +100,9 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
 
     let cancelled = false
 
-    async function connect() {
+    async function connect() 
+    {
+      if (!activeDocId) return  
       try {
         const { streamToken } = await api.createAnnotationStreamToken(activeDocId)
         if (cancelled) return
