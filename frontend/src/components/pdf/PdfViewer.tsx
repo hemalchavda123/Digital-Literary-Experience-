@@ -296,6 +296,7 @@ export function PdfViewer({ doc, onAnnotationClick, onTextContentChange, filtere
           await page.render({
             canvasContext: context,
             viewport,
+            canvas
           }).promise
 
           // Render the selectable text layer
