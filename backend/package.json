@@ -7,6 +7,7 @@
     "test": "vitest --run",
     "test:watch": "vitest",
     "dev": "nodemon src/index.ts",
+    "postinstall": "prisma generate",
     "build": "prisma generate && tsc",
     "start": "node dist/index.js"
   },
@@ -25,7 +26,8 @@
     "express-validator": "^7.3.2",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
-    "pg": "^8.20.0"
+    "pg": "^8.20.0",
+    "prisma": "^7.7.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
@@ -35,7 +37,6 @@
     "@types/node": "^25.6.0",
     "@types/pg": "^8.20.0",
     "nodemon": "^3.1.14",
-    "prisma": "^7.7.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5",
     "vitest": "^4.1.4"
