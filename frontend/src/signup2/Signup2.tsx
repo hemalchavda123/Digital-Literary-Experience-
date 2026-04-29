@@ -285,7 +285,7 @@ export default function Signup2(): JSX.Element {
                 color: "#000",
               }}
             >
-              Lorem ipsum.
+              Digital Literary Studio
             </h2>
 
             <p

@@ -84,7 +84,7 @@ export default function HomePage() {
                   className="text-3xl sm:text-5xl font-extrabold mb-6"
                   style={{ color: "#000000" }}
                 >
-                  Lorem ipsum.
+                  Digital Literary Studio
                 </h2>
                 <p
                   className="text-sm sm:text-base max-w-md mb-8"
