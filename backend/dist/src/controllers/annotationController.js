@@ -38,6 +38,23 @@ async function ensureUserCanAccessDocOr404(docId, userId, res) {
     }
     return true;
 }
+async function getUserPermissions(docId, userId) {
+    const doc = await db_1.default.document.findUnique({
+        where: { id: docId },
+        select: { projectId: true },
+    });
+    if (!doc)
+        return null;
+    const member = await db_1.default.projectMember.findFirst({
+        where: { projectId: doc.projectId, userId },
+        select: {
+            canViewOthersAnnotations: true,
+            canAnnotate: true,
+            canViewAdminAnnotations: true,
+        },
+    });
+    return member;
+}
 const getAnnotationsByDoc = async (req, res) => {
     try {
         const docId = req.params.docId;
@@ -47,7 +64,25 @@ const getAnnotationsByDoc = async (req, res) => {
         }
         if (!(await ensureUserCanAccessDocOr404(docId, userId, res)))
             return;
-        const annotations = await db_1.default.annotation.findMany({
+        const permissions = await getUserPermissions(docId, userId);
+        const isOwner = await isProjectOwnerForDoc(docId, userId);
+        // Owners see all annotations
+        if (isOwner) {
+            const annotations = await db_1.default.annotation.findMany({
+                where: { docId },
+                include: {
+                    user: { select: { username: true } },
+                    comments: {
+                        include: { user: { select: { username: true } } },
+                        orderBy: { createdAt: 'asc' }
+                    }
+                },
+                orderBy: { createdAt: 'asc' },
+            });
+            return res.json(annotations);
+        }
+        // Non-owners: filter based on permissions
+        const allAnnotations = await db_1.default.annotation.findMany({
             where: { docId },
             include: {
                 user: { select: { username: true } },
@@ -58,7 +93,27 @@ const getAnnotationsByDoc = async (req, res) => {
             },
             orderBy: { createdAt: 'asc' },
         });
-        res.json(annotations);
+        // Filter annotations based on permissions
+        const filteredAnnotations = [];
+        for (const ann of allAnnotations) {
+            // Always show user's own annotations
+            if (ann.userId === userId) {
+                filteredAnnotations.push(ann);
+                continue;
+            }
+            // If canViewOthersAnnotations is false, hide others' annotations
+            if (!permissions?.canViewOthersAnnotations)
+                continue;
+            // If canViewAdminAnnotations is false and the annotation is from an admin (owner), hide it
+            if (!permissions?.canViewAdminAnnotations) {
+                // Check if annotation author is project owner
+                const isAnnotatorOwner = await isProjectOwnerForDoc(docId, ann.userId);
+                if (isAnnotatorOwner)
+                    continue;
+            }
+            filteredAnnotations.push(ann);
+        }
+        res.json(filteredAnnotations);
     }
     catch (error) {
         console.error('Error fetching annotations:', error);
@@ -73,8 +128,47 @@ const createAnnotation = async (req, res) => {
         if (!userId) {
             return res.status(401).json({ error: 'User not authenticated' });
         }
+        // Validate required fields
+        if (!docId || !labelId || startOffset === undefined || endOffset === undefined) {
+            return res.status(400).json({ error: 'docId, labelId, startOffset, and endOffset are required' });
+        }
+        // Validate docId and labelId format (UUID)
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(docId)) {
+            return res.status(400).json({ error: 'Invalid docId format' });
+        }
+        if (!uuidRegex.test(labelId)) {
+            return res.status(400).json({ error: 'Invalid labelId format' });
+        }
+        // Validate content if provided
+        if (content !== undefined) {
+            if (typeof content !== 'string') {
+                return res.status(400).json({ error: 'Content must be a string' });
+            }
+            if (content.length > 10000) {
+                return res.status(400).json({ error: 'Content must be less than 10000 characters' });
+            }
+        }
+        // Validate offsets
+        if (typeof startOffset !== 'number' || typeof endOffset !== 'number') {
+            return res.status(400).json({ error: 'startOffset and endOffset must be numbers' });
+        }
+        if (startOffset < 0 || endOffset < 0) {
+            return res.status(400).json({ error: 'Offsets must be non-negative' });
+        }
+        if (startOffset >= endOffset) {
+            return res.status(400).json({ error: 'startOffset must be less than endOffset' });
+        }
         if (!(await ensureUserCanAccessDocOr404(docId, userId, res)))
             return;
+        // Check if user can annotate (unless they're the owner)
+        const isOwner = await isProjectOwnerForDoc(docId, userId);
+        if (!isOwner) {
+            const permissions = await getUserPermissions(docId, userId);
+            if (!permissions?.canAnnotate) {
+                return res.status(403).json({ error: 'You do not have permission to annotate this document' });
+            }
+        }
         // Ensure label belongs to the same project as the document (prevents cross-project tampering)
         const [doc, label] = await Promise.all([
             db_1.default.document.findUnique({ where: { id: docId }, select: { projectId: true } }),

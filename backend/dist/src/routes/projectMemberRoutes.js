@@ -9,6 +9,9 @@ router.use(authMiddleware_1.authMiddleware);
 // Link-based invite routes
 router.post('/:projectId/invites', projectMemberController_1.createInviteLink);
 router.post('/join/:token', projectMemberController_1.joinProjectViaLink);
+// Direct invite routes
+router.post('/:projectId/invite-user', projectMemberController_1.inviteUserById);
+router.post('/:projectId/invite-email', projectMemberController_1.inviteUserByEmail);
 // Member management
 router.get('/:projectId/members', projectMemberController_1.getProjectMembers);
 router.put('/:projectId/members/:memberId', projectMemberController_1.updateMemberRole);

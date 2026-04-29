@@ -10,4 +10,6 @@ router.get('/:id', projectController_1.getProjectById);
 router.post('/', projectController_1.createProject);
 router.put('/:id', projectController_1.updateProject);
 router.delete('/:id', projectController_1.deleteProject);
+router.put('/:projectId/members/:userId/permissions', projectController_1.updateMemberPermissions);
+router.put('/:projectId/default-permissions', projectController_1.updateDefaultPermissions);
 exports.default = router;

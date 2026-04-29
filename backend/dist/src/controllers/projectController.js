@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteProject = exports.updateProject = exports.createProject = exports.getProjectById = exports.getProjects = void 0;
+exports.updateDefaultPermissions = exports.updateMemberPermissions = exports.deleteProject = exports.updateProject = exports.createProject = exports.getProjectById = exports.getProjects = void 0;
 const db_1 = __importDefault(require("../config/db"));
 /**
  * List all projects for the authenticated user
@@ -88,6 +88,14 @@ const createProject = async (req, res) => {
         const { name } = req.body;
         if (!name || !name.trim()) {
             res.status(400).json({ error: 'Project name is required' });
+            return;
+        }
+        if (typeof name !== 'string') {
+            res.status(400).json({ error: 'Project name must be a string' });
+            return;
+        }
+        if (name.trim().length < 1 || name.trim().length > 200) {
+            res.status(400).json({ error: 'Project name must be between 1 and 200 characters' });
             return;
         }
         const project = await db_1.default.project.create({
@@ -178,3 +186,96 @@ const deleteProject = async (req, res) => {
     }
 };
 exports.deleteProject = deleteProject;
+/**
+ * Update member permissions (only project owner can do this)
+ * PUT /api/projects/:projectId/members/:userId/permissions
+ * Body: { canViewOthersAnnotations, canAnnotate, canViewAdminAnnotations }
+ */
+const updateMemberPermissions = async (req, res) => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            res.status(401).json({ error: 'User not authenticated' });
+            return;
+        }
+        const projectId = req.params.projectId;
+        const memberUserId = req.params.userId;
+        // Verify user is project owner
+        const project = await db_1.default.project.findFirst({
+            where: { id: projectId, ownerId: userId },
+        });
+        if (!project) {
+            res.status(403).json({ error: 'Only project owner can update permissions' });
+            return;
+        }
+        // Don't allow changing owner's permissions
+        if (memberUserId === userId) {
+            res.status(400).json({ error: 'Cannot change owner permissions' });
+            return;
+        }
+        // Verify the member exists in the project
+        const member = await db_1.default.projectMember.findFirst({
+            where: { projectId, userId: memberUserId },
+        });
+        if (!member) {
+            res.status(404).json({ error: 'Member not found in project' });
+            return;
+        }
+        const { canViewOthersAnnotations, canAnnotate, canViewAdminAnnotations } = req.body;
+        const updatedMember = await db_1.default.projectMember.update({
+            where: { id: member.id },
+            data: {
+                canViewOthersAnnotations: canViewOthersAnnotations !== undefined ? canViewOthersAnnotations : member.canViewOthersAnnotations,
+                canAnnotate: canAnnotate !== undefined ? canAnnotate : member.canAnnotate,
+                canViewAdminAnnotations: canViewAdminAnnotations !== undefined ? canViewAdminAnnotations : member.canViewAdminAnnotations,
+            },
+            include: {
+                user: { select: { username: true } },
+            },
+        });
+        res.json(updatedMember);
+    }
+    catch (error) {
+        console.error('Error updating member permissions:', error);
+        res.status(500).json({ error: 'Failed to update permissions' });
+    }
+};
+exports.updateMemberPermissions = updateMemberPermissions;
+/**
+ * Update default project permissions (only project owner can do this)
+ * PUT /api/projects/:projectId/default-permissions
+ * Body: { defaultCanViewAnnotations, defaultCanAnnotate, defaultCanViewAdminAnnotations }
+ */
+const updateDefaultPermissions = async (req, res) => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            res.status(401).json({ error: 'User not authenticated' });
+            return;
+        }
+        const projectId = req.params.projectId;
+        // Verify user is project owner
+        const project = await db_1.default.project.findFirst({
+            where: { id: projectId, ownerId: userId },
+        });
+        if (!project) {
+            res.status(403).json({ error: 'Only project owner can update default permissions' });
+            return;
+        }
+        const { defaultCanViewAnnotations, defaultCanAnnotate, defaultCanViewAdminAnnotations } = req.body;
+        const updatedProject = await db_1.default.project.update({
+            where: { id: projectId },
+            data: {
+                defaultCanViewAnnotations: defaultCanViewAnnotations !== undefined ? defaultCanViewAnnotations : project.defaultCanViewAnnotations,
+                defaultCanAnnotate: defaultCanAnnotate !== undefined ? defaultCanAnnotate : project.defaultCanAnnotate,
+                defaultCanViewAdminAnnotations: defaultCanViewAdminAnnotations !== undefined ? defaultCanViewAdminAnnotations : project.defaultCanViewAdminAnnotations,
+            },
+        });
+        res.json(updatedProject);
+    }
+    catch (error) {
+        console.error('Error updating default permissions:', error);
+        res.status(500).json({ error: 'Failed to update default permissions' });
+    }
+};
+exports.updateDefaultPermissions = updateDefaultPermissions;
