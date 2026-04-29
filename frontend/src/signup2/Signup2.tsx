@@ -3,7 +3,7 @@
 import React, { useState, useEffect, JSX } from "react"
 import { useRouter } from "next/navigation"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 
 export default function Signup2(): JSX.Element {
   const [viewIndex, setViewIndex] = useState<number>(0) // 0=signup,1=login,2=forgot
@@ -45,7 +45,7 @@ export default function Signup2(): JSX.Element {
     const password = formData.get("password") as string
 
     try {
-      const res = await fetch(`${API_BASE}/api/auth/register`, {
+      const res = await fetch(`${API_BASE}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, email, password }),
@@ -64,7 +64,7 @@ export default function Signup2(): JSX.Element {
       }
 
       // Registration succeeded — auto-login
-      const loginRes = await fetch(`${API_BASE}/api/auth/login`, {
+      const loginRes = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -99,7 +99,7 @@ export default function Signup2(): JSX.Element {
     const password = formData.get("password") as string
 
     try {
-      const res = await fetch(`${API_BASE}/api/auth/login`, {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -133,7 +133,7 @@ export default function Signup2(): JSX.Element {
     const email = formData.get("email") as string
 
     try {
-      const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
+      const res = await fetch(`${API_BASE}/auth/forgot-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),

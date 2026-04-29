@@ -61,6 +61,8 @@ app.use(
       // Allow non-browser or same-origin requests (no Origin header)
       if (!origin) return cb(null, true);
       if (allowedOrigins.includes(origin)) return cb(null, true);
+      // Also allow Vercel preview deployment URLs for this project
+      if (origin.match(/^https:\/\/digital-literary-experience.*\.vercel\.app$/)) return cb(null, true);
       return cb(new Error('Not allowed by CORS'));
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -84,11 +86,12 @@ app.use('/api/documents', documentRoutes);
 // Error handling middleware (must be last)
 app.use(errorHandler);
 
-// Start server (Prisma connects lazily on first query)
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+// Export app for Vercel serverless functions
+export default app;
 
-// Trigger restart
-
-// Final restart trigger
+// Start server only in local development (Vercel handles its own invocation)
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
