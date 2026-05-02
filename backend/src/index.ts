@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import { createServer } from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -12,6 +13,7 @@ import projectMemberRoutes from './routes/projectMemberRoutes';
 import userRoutes from './routes/userRoutes';
 import announcementRoutes from './routes/announcementRoutes';
 import { errorHandler } from './middleware/errorHandler';
+import { initSocket } from './socket';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -91,9 +93,12 @@ app.use(errorHandler);
 // Export app for Vercel serverless functions
 export default app;
 
+const server = createServer(app);
+
 // Start server only in local development (Vercel handles its own invocation)
 if (process.env.VERCEL !== '1') {
-  app.listen(PORT, () => {
+  initSocket(server);
+  server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
   });
 }

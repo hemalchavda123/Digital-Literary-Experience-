@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
+import { getIo } from '../socket';
 
 /**
  * Get all announcements for a project
@@ -87,7 +88,14 @@ export const createAnnouncement = async (req: Request, res: Response): Promise<v
         projectId,
         content: content.trim(),
       },
+      include: { replies: true }
     });
+
+    try {
+      getIo().to(`project:${projectId}`).emit('announcement_created', announcement);
+    } catch (e) {
+      console.log('Socket not initialized, skipping emit');
+    }
 
     res.status(201).json(announcement);
   } catch (error) {
@@ -131,6 +139,11 @@ export const deleteAnnouncement = async (req: Request, res: Response): Promise<v
     }
 
     await prisma.announcement.delete({ where: { id: announcementId } });
+
+    try {
+      getIo().to(`project:${projectId}`).emit('announcement_deleted', announcementId);
+    } catch (e) {}
+
     res.json({ message: 'Announcement deleted successfully' });
   } catch (error) {
     console.error('Error deleting announcement:', error);
@@ -197,6 +210,10 @@ export const createAnnouncementReply = async (req: Request, res: Response): Prom
       }
     });
 
+    try {
+      getIo().to(`project:${projectId}`).emit('reply_added', { announcementId, reply });
+    } catch (e) {}
+
     res.status(201).json(reply);
   } catch (error) {
     console.error('Error creating reply:', error);
@@ -250,6 +267,11 @@ export const deleteAnnouncementReply = async (req: Request, res: Response): Prom
     }
 
     await prisma.announcementReply.delete({ where: { id: replyId } });
+
+    try {
+      getIo().to(`project:${projectId}`).emit('reply_deleted', { announcementId, replyId });
+    } catch (e) {}
+
     res.json({ message: 'Reply deleted successfully' });
   } catch (error) {
     console.error('Error deleting reply:', error);

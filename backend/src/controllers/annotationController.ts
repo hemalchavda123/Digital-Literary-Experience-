@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import prisma from '../config/db';
 import { addAnnotationSseClient, broadcastAnnotationEvent } from '../realtime/annotationSse';
 import jwt from 'jsonwebtoken';
+import { getIo } from '../socket';
 
 async function isProjectOwnerForDoc(docId: string, userId: string): Promise<boolean> {
   const doc = await prisma.document.findUnique({
@@ -205,6 +206,10 @@ export const createAnnotation = async (req: Request, res: Response) => {
       }
     });
 
+    try {
+      getIo().to(`project:${doc.projectId}`).emit('annotation_created', newAnnotation);
+    } catch (e) {}
+
     res.status(201).json(newAnnotation);
   } catch (error) {
     console.error('Error creating annotation:', error);
@@ -263,6 +268,14 @@ export const updateAnnotation = async (req: Request, res: Response) => {
         }
       }
     });
+
+    try {
+      const docRecord = await prisma.document.findUnique({ where: { id: existing.docId }, select: { projectId: true } });
+      if (docRecord) {
+        getIo().to(`project:${docRecord.projectId}`).emit('annotation_updated', updatedAnnotation);
+      }
+    } catch (e) {}
+
     res.json(updatedAnnotation);
   } catch (error: any) {
     if (error.code === 'P2025') {
@@ -299,6 +312,14 @@ export const deleteAnnotation = async (req: Request, res: Response) => {
     }
 
     await prisma.annotation.delete({ where: { id } });
+
+    try {
+      const docRecord = await prisma.document.findUnique({ where: { id: annotation.docId }, select: { projectId: true } });
+      if (docRecord) {
+        getIo().to(`project:${docRecord.projectId}`).emit('annotation_deleted', { id, docId: annotation.docId });
+      }
+    } catch (e) {}
+
     res.json({ message: 'Annotation deleted successfully' });
   } catch (error: any) {
     if (error.code === 'P2025') {
@@ -345,6 +366,14 @@ export const createComment = async (req: Request, res: Response) => {
     });
 
     broadcastAnnotationEvent(annotation.docId, 'comment_created', { annotationId, comment });
+
+    try {
+      const docRecord = await prisma.document.findUnique({ where: { id: annotation.docId }, select: { projectId: true } });
+      if (docRecord) {
+        getIo().to(`project:${docRecord.projectId}`).emit('comment_created', { annotationId, comment });
+      }
+    } catch (e) {}
+
     res.status(201).json(comment);
   } catch (error) {
     console.error('Error creating comment:', error);
@@ -395,6 +424,16 @@ export const updateComment = async (req: Request, res: Response) => {
       comment: updated,
     });
 
+    try {
+      const docRecord = await prisma.document.findUnique({ where: { id: existing.annotation.docId }, select: { projectId: true } });
+      if (docRecord) {
+        getIo().to(`project:${docRecord.projectId}`).emit('comment_updated', {
+          annotationId: existing.annotation.id,
+          comment: updated,
+        });
+      }
+    } catch (e) {}
+
     res.json(updated);
   } catch (error: any) {
     if (error.code === 'P2025') {
@@ -438,6 +477,17 @@ export const deleteComment = async (req: Request, res: Response) => {
       annotationId: existing.annotationId,
       commentId,
     });
+
+    try {
+      const docRecord = await prisma.document.findUnique({ where: { id: existing.annotation.docId }, select: { projectId: true } });
+      if (docRecord) {
+        getIo().to(`project:${docRecord.projectId}`).emit('comment_deleted', {
+          annotationId: existing.annotationId,
+          commentId,
+        });
+      }
+    } catch (e) {}
+
     res.json({ message: 'Comment deleted successfully' });
   } catch (error: any) {
     if (error.code === 'P2025') {
