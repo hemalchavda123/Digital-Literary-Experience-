@@ -6,6 +6,7 @@ import type { Document } from "@/types/document"
 import type { Announcement } from "@/types/announcement"
 import * as api from "@/lib/api/projects"
 import * as announcementApi from "@/lib/api/announcements"
+import { useSocket } from "@/context/SocketContext"
 
 type ProjectContextValue = {
   projects: Project[]
@@ -47,6 +48,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const tokenRef = useRef<string | null>(null)
+  const { socket, joinProject, leaveProject } = useSocket()
 
   const refreshProjects = useCallback(async () => {
     try {
@@ -94,6 +96,76 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     }
   }, [refreshProjects])
 
+  // Socket event listeners
+  useEffect(() => {
+    if (!socket) return
+
+    const onAnnouncementCreated = (announcement: Announcement) => {
+      setAnnouncementCache((prev) => {
+        const projectId = announcement.projectId
+        const existing = prev[projectId] ?? []
+        if (existing.some((a) => a.id === announcement.id)) return prev
+        const newAnn = { ...announcement, replies: announcement.replies || [] }
+        return { ...prev, [projectId]: [newAnn, ...existing] }
+      })
+    }
+
+    const onAnnouncementDeleted = (announcementId: string) => {
+      setAnnouncementCache((prev) => {
+        const next = { ...prev }
+        for (const [projectId, anns] of Object.entries(next)) {
+          next[projectId] = anns.filter((a) => a.id !== announcementId)
+        }
+        return next
+      })
+    }
+
+    const onReplyAdded = ({ announcementId, reply }: { announcementId: string, reply: any }) => {
+      setAnnouncementCache((prev) => {
+        const next = { ...prev }
+        for (const [projectId, anns] of Object.entries(next)) {
+          next[projectId] = anns.map((ann) => {
+            if (ann.id === announcementId) {
+              const replies = ann.replies ?? []
+              if (replies.some(r => r.id === reply.id)) return ann
+              return { ...ann, replies: [...replies, reply] }
+            }
+            return ann
+          })
+        }
+        return next
+      })
+    }
+
+    const onReplyDeleted = ({ announcementId, replyId }: { announcementId: string, replyId: string }) => {
+      setAnnouncementCache((prev) => {
+        const next = { ...prev }
+        for (const [projectId, anns] of Object.entries(next)) {
+          next[projectId] = anns.map((ann) => {
+            if (ann.id === announcementId) {
+              const replies = ann.replies ?? []
+              return { ...ann, replies: replies.filter(r => r.id !== replyId) }
+            }
+            return ann
+          })
+        }
+        return next
+      })
+    }
+
+    socket.on('announcement_created', onAnnouncementCreated)
+    socket.on('announcement_deleted', onAnnouncementDeleted)
+    socket.on('reply_added', onReplyAdded)
+    socket.on('reply_deleted', onReplyDeleted)
+
+    return () => {
+      socket.off('announcement_created', onAnnouncementCreated)
+      socket.off('announcement_deleted', onAnnouncementDeleted)
+      socket.off('reply_added', onReplyAdded)
+      socket.off('reply_deleted', onReplyDeleted)
+    }
+  }, [socket])
+
   const contextValue: ProjectContextValue = useMemo(() => ({
     projects,
     loading,
@@ -106,6 +178,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
     fetchDocuments: async (projectId) => {
       try {
+        joinProject(projectId)
         const docs = await api.getDocumentsForProject(projectId)
         setDocumentCache((prev) => ({ ...prev, [projectId]: docs }))
         return docs
@@ -196,69 +269,27 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     },
 
     createDocument: async (projectId, title) => {
-      const tempId = `temp-doc-${Date.now()}`
-      const optimisticDoc: Document = {
-        id: tempId,
-        title,
-        projectId,
-        kind: "text",
-        content: "",
-        pdfUrl: "",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }
-
-      setDocumentCache((prev) => ({
-        ...prev,
-        [projectId]: [...(prev[projectId] ?? []), optimisticDoc],
-      }))
-
       try {
         const doc = await api.createDocument(projectId, title, "text")
         setDocumentCache((prev) => ({
           ...prev,
-          [projectId]: (prev[projectId] ?? []).map((d) => (d.id === tempId ? doc : d)),
+          [projectId]: [...(prev[projectId] ?? []), doc],
         }))
         return doc
       } catch (error) {
-        setDocumentCache((prev) => ({
-          ...prev,
-          [projectId]: (prev[projectId] ?? []).filter((d) => d.id !== tempId),
-        }))
         throw error
       }
     },
 
     createPdfDocument: async (projectId, title, content) => {
-      const tempId = `temp-pdf-${Date.now()}`
-      const optimisticDoc: Document = {
-        id: tempId,
-        title,
-        projectId,
-        kind: "pdf",
-        content: "",
-        pdfUrl: content, // Optimistically setting base64
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }
-
-      setDocumentCache((prev) => ({
-        ...prev,
-        [projectId]: [...(prev[projectId] ?? []), optimisticDoc],
-      }))
-
       try {
         const doc = await api.createDocument(projectId, title, "pdf", content)
         setDocumentCache((prev) => ({
           ...prev,
-          [projectId]: (prev[projectId] ?? []).map((d) => (d.id === tempId ? doc : d)),
+          [projectId]: [...(prev[projectId] ?? []), doc],
         }))
         return doc
       } catch (error) {
-        setDocumentCache((prev) => ({
-          ...prev,
-          [projectId]: (prev[projectId] ?? []).filter((d) => d.id !== tempId),
-        }))
         throw error
       }
     },
@@ -388,6 +419,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
     fetchAnnouncements: async (projectId) => {
       try {
+        joinProject(projectId)
         const items = await announcementApi.getAnnouncements(projectId)
         setAnnouncementCache((prev) => ({ ...prev, [projectId]: items }))
         return items
@@ -452,39 +484,103 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     },
 
     addReplyToAnnouncement: async (projectId, announcementId, content) => {
-      const reply = await announcementApi.createAnnouncementReply(projectId, announcementId, content)
+      const tempId = `temp-reply-${Date.now()}`
+      const optimisticReply = {
+        id: tempId,
+        announcementId,
+        userId: "",
+        content,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        user: { username: "Posting..." }
+      }
+
       setAnnouncementCache((prev) => {
         const projectAnns = prev[projectId] ?? []
         const updatedAnns = projectAnns.map((ann) => {
           if (ann.id === announcementId) {
             return {
               ...ann,
-              replies: [...(ann.replies ?? []), reply]
+              replies: [...(ann.replies ?? []), optimisticReply as any]
             }
           }
           return ann
         })
         return { ...prev, [projectId]: updatedAnns }
       })
+
+      try {
+        const reply = await announcementApi.createAnnouncementReply(projectId, announcementId, content)
+        setAnnouncementCache((prev) => {
+          const projectAnns = prev[projectId] ?? []
+          const updatedAnns = projectAnns.map((ann) => {
+            if (ann.id === announcementId) {
+              return {
+                ...ann,
+                replies: (ann.replies ?? []).map(r => r.id === tempId ? reply : r)
+              }
+            }
+            return ann
+          })
+          return { ...prev, [projectId]: updatedAnns }
+        })
+      } catch (error) {
+        setAnnouncementCache((prev) => {
+          const projectAnns = prev[projectId] ?? []
+          const updatedAnns = projectAnns.map((ann) => {
+            if (ann.id === announcementId) {
+              return {
+                ...ann,
+                replies: (ann.replies ?? []).filter(r => r.id !== tempId)
+              }
+            }
+            return ann
+          })
+          return { ...prev, [projectId]: updatedAnns }
+        })
+        throw error
+      }
     },
 
     removeReplyFromAnnouncement: async (projectId, announcementId, replyId) => {
-      await announcementApi.deleteAnnouncementReply(projectId, announcementId, replyId)
+      let originalReply: any;
       setAnnouncementCache((prev) => {
         const projectAnns = prev[projectId] ?? []
         const updatedAnns = projectAnns.map((ann) => {
           if (ann.id === announcementId) {
+            const replies = ann.replies ?? []
+            originalReply = replies.find(r => r.id === replyId)
             return {
               ...ann,
-              replies: (ann.replies ?? []).filter(r => r.id !== replyId)
+              replies: replies.filter(r => r.id !== replyId)
             }
           }
           return ann
         })
         return { ...prev, [projectId]: updatedAnns }
       })
+
+      try {
+        await announcementApi.deleteAnnouncementReply(projectId, announcementId, replyId)
+      } catch (error) {
+        if (originalReply) {
+          setAnnouncementCache((prev) => {
+            const projectAnns = prev[projectId] ?? []
+            const updatedAnns = projectAnns.map((ann) => {
+              if (ann.id === announcementId) {
+                const arr = [...(ann.replies ?? []), originalReply]
+                arr.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+                return { ...ann, replies: arr }
+              }
+              return ann
+            })
+            return { ...prev, [projectId]: updatedAnns }
+          })
+        }
+        throw error
+      }
     },
-  }), [projects, documentCache, announcementCache, loading, error, refreshProjects])
+  }), [projects, documentCache, announcementCache, loading, error, refreshProjects, joinProject, leaveProject])
 
   return <ProjectContext.Provider value={contextValue}>{children}</ProjectContext.Provider>
 }
