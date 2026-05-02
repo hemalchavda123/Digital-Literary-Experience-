@@ -12,6 +12,7 @@ import documentRoutes from './routes/documentRoutes';
 import projectMemberRoutes from './routes/projectMemberRoutes';
 import userRoutes from './routes/userRoutes';
 import announcementRoutes from './routes/announcementRoutes';
+import assignmentRoutes from './routes/assignmentRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { initSocket } from './socket';
 
@@ -85,6 +86,7 @@ app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/projects', projectMemberRoutes);
 app.use('/api/projects/:projectId/announcements', announcementRoutes);
+app.use('/api/projects/:projectId/assignments', assignmentRoutes);
 app.use('/api/documents', documentRoutes);
 
 // Error handling middleware (must be last)
