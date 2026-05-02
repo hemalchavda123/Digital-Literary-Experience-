@@ -3,7 +3,9 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback, ReactNode, useRef } from "react"
 import type { Project } from "@/types/project"
 import type { Document } from "@/types/document"
+import type { Announcement } from "@/types/announcement"
 import * as api from "@/lib/api/projects"
+import * as announcementApi from "@/lib/api/announcements"
 
 type ProjectContextValue = {
   projects: Project[]
@@ -22,6 +24,12 @@ type ProjectContextValue = {
   renameDocument: (id: string, title: string) => Promise<void>
   updateDocumentContent: (id: string, content: string) => Promise<void>
   deleteDocument: (id: string) => Promise<void>
+  announcementsForProject: (projectId: string) => Announcement[]
+  fetchAnnouncements: (projectId: string) => Promise<Announcement[]>
+  createAnnouncement: (projectId: string, content: string) => Promise<Announcement>
+  deleteAnnouncement: (projectId: string, announcementId: string) => Promise<void>
+  addReplyToAnnouncement: (projectId: string, announcementId: string, content: string) => Promise<void>
+  removeReplyFromAnnouncement: (projectId: string, announcementId: string, replyId: string) => Promise<void>
 }
 
 const ProjectContext = createContext<ProjectContextValue | undefined>(undefined)
@@ -35,6 +43,7 @@ export function useProjects() {
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([])
   const [documentCache, setDocumentCache] = useState<Record<string, Document[]>>({})
+  const [announcementCache, setAnnouncementCache] = useState<Record<string, Announcement[]>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const tokenRef = useRef<string | null>(null)
@@ -126,9 +135,6 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         id: tempId,
         name,
         ownerId: "",
-        defaultCanViewAnnotations: false,
-        defaultCanAnnotate: true,
-        defaultCanViewAdminAnnotations: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }
@@ -195,9 +201,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         id: tempId,
         title,
         projectId,
-        type: "text",
-        content: null,
-        pdfUrl: null,
+        kind: "text",
+        content: "",
+        pdfUrl: "",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }
@@ -229,8 +235,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         id: tempId,
         title,
         projectId,
-        type: "pdf",
-        content: null,
+        kind: "pdf",
+        content: "",
         pdfUrl: content, // Optimistically setting base64
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -377,7 +383,108 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         throw error
       }
     },
-  }), [projects, documentCache, loading, error, refreshProjects])
+
+    announcementsForProject: (projectId) => announcementCache[projectId] ?? [],
+
+    fetchAnnouncements: async (projectId) => {
+      try {
+        const items = await announcementApi.getAnnouncements(projectId)
+        setAnnouncementCache((prev) => ({ ...prev, [projectId]: items }))
+        return items
+      } catch (err: any) {
+        setError(err.message)
+        return []
+      }
+    },
+
+    createAnnouncement: async (projectId, content) => {
+      const tempId = `temp-ann-${Date.now()}`
+      const optimisticAnn: Announcement = {
+        id: tempId,
+        projectId,
+        content,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+
+      setAnnouncementCache((prev) => ({
+        ...prev,
+        [projectId]: [optimisticAnn, ...(prev[projectId] ?? [])],
+      }))
+
+      try {
+        const item = await announcementApi.createAnnouncement(projectId, content)
+        setAnnouncementCache((prev) => ({
+          ...prev,
+          [projectId]: (prev[projectId] ?? []).map((a) => (a.id === tempId ? item : a)),
+        }))
+        return item
+      } catch (error) {
+        setAnnouncementCache((prev) => ({
+          ...prev,
+          [projectId]: (prev[projectId] ?? []).filter((a) => a.id !== tempId),
+        }))
+        throw error
+      }
+    },
+
+    deleteAnnouncement: async (projectId, announcementId) => {
+      const originalAnn = (announcementCache[projectId] ?? []).find((a) => a.id === announcementId)
+
+      setAnnouncementCache((prev) => ({
+        ...prev,
+        [projectId]: (prev[projectId] ?? []).filter((a) => a.id !== announcementId),
+      }))
+
+      try {
+        await announcementApi.deleteAnnouncement(projectId, announcementId)
+      } catch (error) {
+        if (originalAnn) {
+          setAnnouncementCache((prev) => {
+            const arr = [...(prev[projectId] ?? [])]
+            arr.push(originalAnn)
+            arr.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+            return { ...prev, [projectId]: arr }
+          })
+        }
+        throw error
+      }
+    },
+
+    addReplyToAnnouncement: async (projectId, announcementId, content) => {
+      const reply = await announcementApi.createAnnouncementReply(projectId, announcementId, content)
+      setAnnouncementCache((prev) => {
+        const projectAnns = prev[projectId] ?? []
+        const updatedAnns = projectAnns.map((ann) => {
+          if (ann.id === announcementId) {
+            return {
+              ...ann,
+              replies: [...(ann.replies ?? []), reply]
+            }
+          }
+          return ann
+        })
+        return { ...prev, [projectId]: updatedAnns }
+      })
+    },
+
+    removeReplyFromAnnouncement: async (projectId, announcementId, replyId) => {
+      await announcementApi.deleteAnnouncementReply(projectId, announcementId, replyId)
+      setAnnouncementCache((prev) => {
+        const projectAnns = prev[projectId] ?? []
+        const updatedAnns = projectAnns.map((ann) => {
+          if (ann.id === announcementId) {
+            return {
+              ...ann,
+              replies: (ann.replies ?? []).filter(r => r.id !== replyId)
+            }
+          }
+          return ann
+        })
+        return { ...prev, [projectId]: updatedAnns }
+      })
+    },
+  }), [projects, documentCache, announcementCache, loading, error, refreshProjects])
 
   return <ProjectContext.Provider value={contextValue}>{children}</ProjectContext.Provider>
 }

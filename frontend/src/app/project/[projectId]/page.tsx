@@ -7,18 +7,21 @@ import { useProjects } from "@/context/ProjectContext"
 import { DocumentList } from "@/components/project/DocumentList"
 import { CreateDocumentButton } from "@/components/project/CreateDocumentButton"
 import { ShareModal } from "@/components/project/ShareModal"
+import { AnnouncementList } from "@/components/project/AnnouncementList"
 import { useState, useEffect } from "react"
 import { getCurrentUser } from "@/lib/api/authFetch"
 
 export default function ProjectPage() {
   const params = useParams<{ projectId: string }>()
   const router = useRouter()
-  const { getProjectById, documentsForProject, fetchDocuments, renameProject, deleteProject, loading } = useProjects()
+  const { getProjectById, documentsForProject, fetchDocuments, fetchAnnouncements, renameProject, deleteProject, loading } = useProjects()
   const projectId = params.projectId
   const project = getProjectById(projectId)
   const docs = documentsForProject(projectId)
   const [name, setName] = useState(project?.name ?? "")
   const [docsLoaded, setDocsLoaded] = useState(false)
+  const [annsLoaded, setAnnsLoaded] = useState(false)
+  const [activeTab, setActiveTab] = useState<"documents" | "announcements">("documents")
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
   const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -43,12 +46,15 @@ export default function ProjectPage() {
     checkAuth()
   }, [router])
 
-  // Fetch documents when the project page loads
+  // Fetch documents and announcements when the project page loads
   useEffect(() => {
     if (projectId && !docsLoaded) {
       fetchDocuments(projectId).then(() => setDocsLoaded(true))
     }
-  }, [projectId, docsLoaded, fetchDocuments])
+    if (projectId && !annsLoaded) {
+      fetchAnnouncements(projectId).then(() => setAnnsLoaded(true))
+    }
+  }, [projectId, docsLoaded, annsLoaded, fetchDocuments, fetchAnnouncements])
 
   // Sync name when project data arrives
   useEffect(() => {
@@ -163,11 +169,44 @@ export default function ProjectPage() {
             </div>
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <CreateDocumentButton projectId={project.id} />
+          <div className="mt-8 border-b border-gray-200">
+            <nav className="-mb-px flex gap-6" aria-label="Tabs">
+              <button
+                onClick={() => setActiveTab("documents")}
+                className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === "documents"
+                    ? "border-black text-black"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                Documents
+              </button>
+              <button
+                onClick={() => setActiveTab("announcements")}
+                className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === "announcements"
+                    ? "border-black text-black"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                Announcements
+              </button>
+            </nav>
           </div>
 
-          <DocumentList documents={docs} />
+          <div className="mt-6">
+            {activeTab === "documents" && (
+              <>
+                <div className="flex flex-wrap items-center gap-3 mb-6">
+                  <CreateDocumentButton projectId={project.id} />
+                </div>
+                <DocumentList documents={docs} />
+              </>
+            )}
+            {activeTab === "announcements" && (
+              <AnnouncementList projectId={project.id} isOwner={currentUser?.id === project.ownerId} currentUserId={currentUser?.id} />
+            )}
+          </div>
         </div>
       </main>
       <Footer />

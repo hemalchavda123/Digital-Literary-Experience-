@@ -10,6 +10,7 @@ import projectRoutes from './routes/projectRoutes';
 import documentRoutes from './routes/documentRoutes';
 import projectMemberRoutes from './routes/projectMemberRoutes';
 import userRoutes from './routes/userRoutes';
+import announcementRoutes from './routes/announcementRoutes';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -81,6 +82,7 @@ app.use('/api/labels', labelRoutes);
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/projects', projectMemberRoutes);
+app.use('/api/projects/:projectId/announcements', announcementRoutes);
 app.use('/api/documents', documentRoutes);
 
 // Error handling middleware (must be last)

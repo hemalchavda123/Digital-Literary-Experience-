@@ -25,6 +25,7 @@ model User {
   annotations        Annotation[]
   projectMemberships ProjectMember[]
   annotationComments AnnotationComment[]
+  announcementReplies AnnouncementReply[]
 
   @@index([email])
   @@index([username])
@@ -46,10 +47,11 @@ model Project {
   updatedAt                   DateTime @updatedAt
 
   owner     User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  documents Document[]
-  labels    Label[]
-  members   ProjectMember[]
-  invites   ProjectInvite[]
+  documents   Document[]
+  labels      Label[]
+  members     ProjectMember[]
+  invites     ProjectInvite[]
+  announcements Announcement[]
 
   @@index([ownerId])
 }
@@ -150,5 +152,33 @@ model AnnotationComment {
   user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([annotationId])
+  @@index([userId])
+}
+
+model Announcement {
+  id        String   @id @default(uuid())
+  projectId String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  replies   AnnouncementReply[]
+
+  @@index([projectId])
+}
+
+model AnnouncementReply {
+  id             String       @id @default(uuid())
+  announcementId String
+  userId         String
+  content        String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([announcementId])
   @@index([userId])
 }
