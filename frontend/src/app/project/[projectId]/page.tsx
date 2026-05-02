@@ -8,20 +8,22 @@ import { DocumentList } from "@/components/project/DocumentList"
 import { CreateDocumentButton } from "@/components/project/CreateDocumentButton"
 import { ShareModal } from "@/components/project/ShareModal"
 import { AnnouncementList } from "@/components/project/AnnouncementList"
+import { AssignmentList } from "@/components/project/AssignmentList"
 import { useState, useEffect } from "react"
 import { getCurrentUser } from "@/lib/api/authFetch"
 
 export default function ProjectPage() {
   const params = useParams<{ projectId: string }>()
   const router = useRouter()
-  const { getProjectById, documentsForProject, fetchDocuments, fetchAnnouncements, renameProject, deleteProject, loading } = useProjects()
+  const { getProjectById, documentsForProject, fetchDocuments, fetchAnnouncements, fetchAssignments, renameProject, deleteProject, loading } = useProjects()
   const projectId = params.projectId
   const project = getProjectById(projectId)
   const docs = documentsForProject(projectId)
   const [name, setName] = useState(project?.name ?? "")
   const [docsLoaded, setDocsLoaded] = useState(false)
   const [annsLoaded, setAnnsLoaded] = useState(false)
-  const [activeTab, setActiveTab] = useState<"documents" | "announcements">("documents")
+  const [assignsLoaded, setAssignsLoaded] = useState(false)
+  const [activeTab, setActiveTab] = useState<"documents" | "announcements" | "assignments">("documents")
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
   const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -54,7 +56,10 @@ export default function ProjectPage() {
     if (projectId && !annsLoaded) {
       fetchAnnouncements(projectId).then(() => setAnnsLoaded(true))
     }
-  }, [projectId, docsLoaded, annsLoaded, fetchDocuments, fetchAnnouncements])
+    if (projectId && !assignsLoaded) {
+      fetchAssignments(projectId).then(() => setAssignsLoaded(true))
+    }
+  }, [projectId, docsLoaded, annsLoaded, assignsLoaded, fetchDocuments, fetchAnnouncements, fetchAssignments])
 
   // Sync name when project data arrives
   useEffect(() => {
@@ -191,6 +196,16 @@ export default function ProjectPage() {
               >
                 Announcements
               </button>
+              <button
+                onClick={() => setActiveTab("assignments")}
+                className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === "assignments"
+                    ? "border-black text-black"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                Assignments
+              </button>
             </nav>
           </div>
 
@@ -205,6 +220,9 @@ export default function ProjectPage() {
             )}
             {activeTab === "announcements" && (
               <AnnouncementList projectId={project.id} isOwner={currentUser?.id === project.ownerId} currentUserId={currentUser?.id} />
+            )}
+            {activeTab === "assignments" && (
+              <AssignmentList projectId={project.id} isOwner={currentUser?.id === project.ownerId} currentUserId={currentUser?.id} />
             )}
           </div>
         </div>

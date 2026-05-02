@@ -4,8 +4,10 @@ import { createContext, useContext, useEffect, useMemo, useState, useCallback, R
 import type { Project } from "@/types/project"
 import type { Document } from "@/types/document"
 import type { Announcement } from "@/types/announcement"
+import type { Assignment } from "@/types/assignment"
 import * as api from "@/lib/api/projects"
 import * as announcementApi from "@/lib/api/announcements"
+import * as assignmentApi from "@/lib/api/assignments"
 import { useSocket } from "@/context/SocketContext"
 
 type ProjectContextValue = {
@@ -31,6 +33,11 @@ type ProjectContextValue = {
   deleteAnnouncement: (projectId: string, announcementId: string) => Promise<void>
   addReplyToAnnouncement: (projectId: string, announcementId: string, content: string) => Promise<void>
   removeReplyFromAnnouncement: (projectId: string, announcementId: string, replyId: string) => Promise<void>
+  assignmentsForProject: (projectId: string) => Assignment[]
+  fetchAssignments: (projectId: string) => Promise<Assignment[]>
+  createAssignment: (projectId: string, title: string, description: string, dueDate?: string, totalMarks?: number) => Promise<Assignment>
+  deleteAssignment: (projectId: string, assignmentId: string) => Promise<void>
+  updateAssignmentStatus: (projectId: string, assignmentId: string, userId: string, status?: string, grade?: string) => Promise<void>
 }
 
 const ProjectContext = createContext<ProjectContextValue | undefined>(undefined)
@@ -45,6 +52,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([])
   const [documentCache, setDocumentCache] = useState<Record<string, Document[]>>({})
   const [announcementCache, setAnnouncementCache] = useState<Record<string, Announcement[]>>({})
+  const [assignmentCache, setAssignmentCache] = useState<Record<string, Assignment[]>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const tokenRef = useRef<string | null>(null)
@@ -166,6 +174,66 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     }
   }, [socket])
 
+  // Assignment socket listeners
+  useEffect(() => {
+    if (!socket) return
+
+    const onAssignmentCreated = (assignment: Assignment) => {
+      setAssignmentCache((prev) => {
+        const projectId = assignment.projectId
+        const existing = prev[projectId] ?? []
+        if (existing.some((a) => a.id === assignment.id)) return prev
+        return { ...prev, [projectId]: [assignment, ...existing] }
+      })
+    }
+
+    const onAssignmentDeleted = (assignmentId: string) => {
+      setAssignmentCache((prev) => {
+        const next = { ...prev }
+        for (const projectId of Object.keys(next)) {
+          next[projectId] = next[projectId].filter((a) => a.id !== assignmentId)
+        }
+        return next
+      })
+    }
+
+    const onAssignmentStatusUpdated = ({
+      assignmentId,
+      status: updatedStatus,
+    }: {
+      assignmentId: string
+      status: Assignment['statuses'][number]
+    }) => {
+      setAssignmentCache((prev) => {
+        const next = { ...prev }
+        for (const projectId of Object.keys(next)) {
+          next[projectId] = next[projectId].map((a) => {
+            if (a.id !== assignmentId) return a
+            const newStatuses = (a.statuses ?? []).map((s) =>
+              s.id === updatedStatus.id ? updatedStatus : s
+            )
+            // If not found (e.g., new member), add it
+            if (!newStatuses.some((s) => s.id === updatedStatus.id)) {
+              newStatuses.push(updatedStatus)
+            }
+            return { ...a, statuses: newStatuses }
+          })
+        }
+        return next
+      })
+    }
+
+    socket.on('assignment_created', onAssignmentCreated)
+    socket.on('assignment_deleted', onAssignmentDeleted)
+    socket.on('assignment_status_updated', onAssignmentStatusUpdated)
+
+    return () => {
+      socket.off('assignment_created', onAssignmentCreated)
+      socket.off('assignment_deleted', onAssignmentDeleted)
+      socket.off('assignment_status_updated', onAssignmentStatusUpdated)
+    }
+  }, [socket])
+
   const contextValue: ProjectContextValue = useMemo(() => ({
     projects,
     loading,
@@ -175,6 +243,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     getProjectById: (id) => projects.find((p) => p.id === id),
 
     documentsForProject: (projectId) => documentCache[projectId] ?? [],
+    assignmentsForProject: (projectId) => assignmentCache[projectId] ?? [],
 
     fetchDocuments: async (projectId) => {
       try {
@@ -580,7 +649,87 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         throw error
       }
     },
-  }), [projects, documentCache, announcementCache, loading, error, refreshProjects, joinProject, leaveProject])
+
+    fetchAssignments: async (projectId) => {
+      try {
+        const items = await assignmentApi.getAssignments(projectId)
+        setAssignmentCache((prev) => ({ ...prev, [projectId]: items }))
+        return items
+      } catch (err: any) {
+        return []
+      }
+    },
+
+    createAssignment: async (projectId, title, description, dueDate, totalMarks) => {
+      const tempId = `temp-assignment-${Date.now()}`
+      const optimistic: Assignment = {
+        id: tempId,
+        projectId,
+        title,
+        description,
+        dueDate: dueDate ?? null,
+        totalMarks: totalMarks ?? null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        statuses: [],
+      }
+      setAssignmentCache((prev) => ({
+        ...prev,
+        [projectId]: [optimistic, ...(prev[projectId] ?? [])],
+      }))
+      try {
+        const item = await assignmentApi.createAssignment(projectId, title, description, dueDate, totalMarks)
+        setAssignmentCache((prev) => ({
+          ...prev,
+          [projectId]: (prev[projectId] ?? []).map((a) => (a.id === tempId ? item : a)),
+        }))
+        return item
+      } catch (error) {
+        setAssignmentCache((prev) => ({
+          ...prev,
+          [projectId]: (prev[projectId] ?? []).filter((a) => a.id !== tempId),
+        }))
+        throw error
+      }
+    },
+
+    deleteAssignment: async (projectId, assignmentId) => {
+      const original = (assignmentCache[projectId] ?? []).find((a) => a.id === assignmentId)
+      setAssignmentCache((prev) => ({
+        ...prev,
+        [projectId]: (prev[projectId] ?? []).filter((a) => a.id !== assignmentId),
+      }))
+      try {
+        await assignmentApi.deleteAssignment(projectId, assignmentId)
+      } catch (error) {
+        if (original) {
+          setAssignmentCache((prev) => ({
+            ...prev,
+            [projectId]: [original, ...(prev[projectId] ?? [])],
+          }))
+        }
+        throw error
+      }
+    },
+
+    updateAssignmentStatus: async (projectId, assignmentId, userId, status, grade) => {
+      // Wait for backend — then update cache with real server response
+      const updated = await assignmentApi.updateAssignmentStatus(projectId, assignmentId, userId, status, grade)
+      setAssignmentCache((prev) => {
+        const next = { ...prev }
+        next[projectId] = (next[projectId] ?? []).map((a) => {
+          if (a.id !== assignmentId) return a
+          const exists = (a.statuses ?? []).some((s) => s.id === updated.id)
+          const newStatuses = exists
+            ? (a.statuses ?? []).map((s) => (s.id === updated.id ? updated : s))
+            : [...(a.statuses ?? []), updated]
+          return { ...a, statuses: newStatuses }
+        })
+        return next
+      })
+    },
+
+  }), [projects, documentCache, announcementCache, assignmentCache, loading, error, refreshProjects, joinProject, leaveProject])
 
   return <ProjectContext.Provider value={contextValue}>{children}</ProjectContext.Provider>
 }
