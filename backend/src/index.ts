@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import { createServer } from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -10,7 +11,10 @@ import projectRoutes from './routes/projectRoutes';
 import documentRoutes from './routes/documentRoutes';
 import projectMemberRoutes from './routes/projectMemberRoutes';
 import userRoutes from './routes/userRoutes';
+import announcementRoutes from './routes/announcementRoutes';
+import assignmentRoutes from './routes/assignmentRoutes';
 import { errorHandler } from './middleware/errorHandler';
+import { initSocket } from './socket';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -81,6 +85,8 @@ app.use('/api/labels', labelRoutes);
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/projects', projectMemberRoutes);
+app.use('/api/projects/:projectId/announcements', announcementRoutes);
+app.use('/api/projects/:projectId/assignments', assignmentRoutes);
 app.use('/api/documents', documentRoutes);
 
 // Error handling middleware (must be last)
@@ -89,9 +95,12 @@ app.use(errorHandler);
 // Export app for Vercel serverless functions
 export default app;
 
+const server = createServer(app);
+
 // Start server only in local development (Vercel handles its own invocation)
 if (process.env.VERCEL !== '1') {
-  app.listen(PORT, () => {
+  initSocket(server);
+  server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
   });
 }

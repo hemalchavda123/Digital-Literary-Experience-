@@ -112,7 +112,7 @@ export default function Navbar() {
                         textDecoration: "none",
                         color: "#000"
                     }}>
-                        Digital Literary Experience
+                        Exegesis
                     </Link>
 
                     {/* Center Links */}

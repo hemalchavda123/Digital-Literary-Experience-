@@ -19,7 +19,6 @@ export function ShareModal({ isOpen, onClose, projectId, isOwner = false }: Prop
   const [inviteLink, setInviteLink] = useState("")
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState("")
-  const [selectedMemberId, setSelectedMemberId] = useState<string>("")
   const [defaultPermissions, setDefaultPermissions] = useState({
     canViewOthersAnnotations: false,
     canAnnotate: true,
@@ -156,14 +155,25 @@ export function ShareModal({ isOpen, onClose, projectId, isOwner = false }: Prop
       const member = members.find(m => m.userId === memberId)
       if (!member) return
       
+      const updatedValue = !member[permission]
       const updatedPermissions = {
-        [permission]: !member[permission]
+        [permission]: updatedValue
       }
       
-      await updateMemberPermissions(projectId, memberId, updatedPermissions)
+      // Optimistically update UI
       setMembers(prev => prev.map(m => m.userId === memberId ? { ...m, ...updatedPermissions } : m))
+      
+      await updateMemberPermissions(projectId, memberId, updatedPermissions)
     } catch (err: any) {
       setError(err.message || "Failed to update permissions")
+      // Revert UI on error
+      setMembers(prev => prev.map(m => {
+        if (m.userId === memberId) {
+          const member = members.find(orig => orig.userId === memberId)
+          return member ? { ...m, [permission]: member[permission] } : m
+        }
+        return m
+      }))
     }
   }
 
@@ -215,22 +225,12 @@ export function ShareModal({ isOpen, onClose, projectId, isOwner = false }: Prop
             {/* Invite Link Content */}
             {inviteType === "link" && (
               <div className="flex flex-col gap-2 pt-2">
-                <div className="flex gap-2">
-                  <select
-                    value={inviteRole}
-                    onChange={e => setInviteRole(e.target.value as Role)}
-                    className="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-black"
-                  >
-                    <option value="VIEWER">Can View</option>
-                    <option value="EDITOR">Can Edit</option>
-                  </select>
-                  <button
-                    onClick={handleGenerateLink}
-                    className="px-4 py-2 bg-black text-white text-sm font-medium rounded hover:bg-gray-800"
-                  >
-                    Generate Link
-                  </button>
-                </div>
+                <button
+                  onClick={handleGenerateLink}
+                  className="px-4 py-2 bg-black text-white text-sm font-medium rounded hover:bg-gray-800"
+                >
+                  Generate Link
+                </button>
                 {inviteLink && (
                   <div className="mt-3 flex items-center gap-2">
                     <input
@@ -262,14 +262,6 @@ export function ShareModal({ isOpen, onClose, projectId, isOwner = false }: Prop
                     placeholder="Enter user ID"
                     className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-black"
                   />
-                  <select
-                    value={inviteRole}
-                    onChange={e => setInviteRole(e.target.value as Role)}
-                    className="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-black"
-                  >
-                    <option value="VIEWER">Can View</option>
-                    <option value="EDITOR">Can Edit</option>
-                  </select>
                   <button
                     onClick={handleInviteById}
                     className="px-4 py-2 bg-black text-white text-sm font-medium rounded hover:bg-gray-800"
@@ -291,14 +283,6 @@ export function ShareModal({ isOpen, onClose, projectId, isOwner = false }: Prop
                     placeholder="Enter email address"
                     className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-black"
                   />
-                  <select
-                    value={inviteRole}
-                    onChange={e => setInviteRole(e.target.value as Role)}
-                    className="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:border-black"
-                  >
-                    <option value="VIEWER">Can View</option>
-                    <option value="EDITOR">Can Edit</option>
-                  </select>
                   <button
                     onClick={handleInviteByEmail}
                     className="px-4 py-2 bg-black text-white text-sm font-medium rounded hover:bg-gray-800"
@@ -358,83 +342,58 @@ export function ShareModal({ isOpen, onClose, projectId, isOwner = false }: Prop
               <p className="text-sm text-gray-500">No members yet. Share a link to invite others.</p>
             ) : (
               <>
-                {isOwner && (
-                  <select
-                    value={selectedMemberId}
-                    onChange={e => setSelectedMemberId(e.target.value)}
-                    className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-black"
-                  >
-                    <option value="">Select a member to edit permissions</option>
-                    {members.map(member => (
-                      <option key={member.id} value={member.userId}>
-                        {member.user?.username || "Unknown"} ({member.role})
-                      </option>
-                    ))}
-                  </select>
-                )}
-
-                <ul className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
+                <ul className="flex flex-col gap-3 max-h-96 overflow-y-auto pr-1">
                   {members.map(member => (
-                    <li key={member.id} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded border border-gray-100">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium text-gray-900">{member.user?.username || "Unknown"}</span>
-                        <span className="text-xs text-gray-500">{member.user?.email || ""}</span>
+                    <li key={member.id} className="p-3 rounded border border-gray-200 bg-white">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium text-gray-900">{member.user?.username || "Unknown"}</span>
+                          <span className="text-xs text-gray-500">{member.user?.email || ""}</span>
+                        </div>
+                        {isOwner && (
+                          <button
+                            onClick={() => handleRemoveMember(member.userId)}
+                            className="p-1 text-gray-400 hover:text-red-600"
+                            title="Remove member"
+                          >
+                            <UserMinus size={16} />
+                          </button>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={member.role}
-                          onChange={e => handleRoleChange(member.userId, e.target.value as Role)}
-                          className="text-xs border border-gray-300 rounded px-2 py-1 text-gray-700 font-medium focus:outline-none focus:border-black cursor-pointer"
-                        >
-                          <option value="VIEWER">Viewer</option>
-                          <option value="EDITOR">Editor</option>
-                        </select>
-                        <button
-                          onClick={() => handleRemoveMember(member.userId)}
-                          className="p-1 text-gray-400 hover:text-red-600"
-                          title="Remove member"
-                        >
-                          <UserMinus size={14} />
-                        </button>
-                      </div>
+                      {isOwner && (
+                        <div className="flex flex-col gap-2 pl-2 border-l-2 border-gray-100">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs text-gray-600">Can view others' annotations</label>
+                            <button
+                              onClick={() => handlePermissionToggle(member.userId, 'canViewOthersAnnotations')}
+                              className={`w-10 h-5 rounded-full transition-colors ${member.canViewOthersAnnotations ? 'bg-black' : 'bg-gray-300'} relative`}
+                            >
+                              <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-transform ${member.canViewOthersAnnotations ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                            </button>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs text-gray-600">Can annotate</label>
+                            <button
+                              onClick={() => handlePermissionToggle(member.userId, 'canAnnotate')}
+                              className={`w-10 h-5 rounded-full transition-colors ${member.canAnnotate ? 'bg-black' : 'bg-gray-300'} relative`}
+                            >
+                              <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-transform ${member.canAnnotate ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                            </button>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs text-gray-600">Can view admin annotations</label>
+                            <button
+                              onClick={() => handlePermissionToggle(member.userId, 'canViewAdminAnnotations')}
+                              className={`w-10 h-5 rounded-full transition-colors ${member.canViewAdminAnnotations ? 'bg-black' : 'bg-gray-300'} relative`}
+                            >
+                              <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-transform ${member.canViewAdminAnnotations ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>
-
-                {isOwner && selectedMemberId && (
-                  <div className="flex flex-col gap-2 p-3 bg-gray-50 rounded border border-gray-200 mt-2">
-                    <h4 className="text-xs font-medium text-gray-900">
-                      {members.find(m => m.userId === selectedMemberId)?.user?.username}'s Permissions
-                    </h4>
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs text-gray-600">Can view others' annotations</label>
-                      <button
-                        onClick={() => handlePermissionToggle(selectedMemberId, 'canViewOthersAnnotations')}
-                        className={`w-10 h-5 rounded-full transition-colors ${members.find(m => m.userId === selectedMemberId)?.canViewOthersAnnotations ? 'bg-black' : 'bg-gray-300'} relative`}
-                      >
-                        <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-transform ${members.find(m => m.userId === selectedMemberId)?.canViewOthersAnnotations ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs text-gray-600">Can annotate</label>
-                      <button
-                        onClick={() => handlePermissionToggle(selectedMemberId, 'canAnnotate')}
-                        className={`w-10 h-5 rounded-full transition-colors ${members.find(m => m.userId === selectedMemberId)?.canAnnotate ? 'bg-black' : 'bg-gray-300'} relative`}
-                      >
-                        <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-transform ${members.find(m => m.userId === selectedMemberId)?.canAnnotate ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs text-gray-600">Can view admin annotations</label>
-                      <button
-                        onClick={() => handlePermissionToggle(selectedMemberId, 'canViewAdminAnnotations')}
-                        className={`w-10 h-5 rounded-full transition-colors ${members.find(m => m.userId === selectedMemberId)?.canViewAdminAnnotations ? 'bg-black' : 'bg-gray-300'} relative`}
-                      >
-                        <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-transform ${members.find(m => m.userId === selectedMemberId)?.canViewAdminAnnotations ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                      </button>
-                    </div>
-                  </div>
-                )}
               </>
             )}
           </div>

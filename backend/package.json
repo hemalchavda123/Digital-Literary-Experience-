@@ -8,6 +8,7 @@
     "test:watch": "vitest",
     "dev:local": "nodemon src/index.ts",
     "postinstall": "prisma generate",
+    "vercel-build": "prisma migrate deploy && prisma generate && tsc",
     "build": "prisma generate && tsc",
     "start": "node dist/index.js"
   },
@@ -28,7 +29,8 @@
     "jsonwebtoken": "^9.0.3",
     "nodemailer": "^8.0.7",
     "pg": "^8.20.0",
-    "prisma": "^7.7.0"
+    "prisma": "^7.7.0",
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",

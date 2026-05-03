@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode, useCallback } from "react"
 import { AnnotationLabel, TextAnnotation } from "@/types/annotation"
 import * as api from "@/lib/api/annotations"
+import { useSocket } from "@/context/SocketContext"
 
 type CommentCreatedEvent = { annotationId: string; comment: NonNullable<TextAnnotation["comments"]>[number] }
 type CommentUpdatedEvent = { annotationId: string; comment: NonNullable<TextAnnotation["comments"]>[number] }
@@ -47,11 +48,8 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const [activeDocId, setActiveDocId] = useState<string | null>(null)
   const [filters, setFiltersState] = useState<{ userId: string | null; labelId: string | null }>({ userId: null, labelId: null })
-  const sseRef = useRef<EventSource | null>(null)
-
-  const API_BASE_URL = useMemo(() => {
-    return process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
-  }, [])
+  
+  const { socket } = useSocket()
 
   const setFilters = (newFilters: { userId: string | null; labelId: string | null }) => {
     setFiltersState(newFilters)
@@ -89,107 +87,74 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    if (!activeDocId) return
-    if (typeof window === "undefined") return
+    if (!socket || !activeDocId) return
 
-    // Reset existing stream on doc change
-    if (sseRef.current) {
-      sseRef.current.close()
-      sseRef.current = null
+    const onAnnotationCreated = (annotation: TextAnnotation) => {
+      if (annotation.docId !== activeDocId) return
+      setAnnotations((prev) => {
+        if (prev.some((a) => a.id === annotation.id)) return prev
+        return [...prev, annotation]
+      })
     }
 
-    let cancelled = false
-
-    async function connect() 
-    {
-      if (!activeDocId) return  
-      try {
-        const { streamToken } = await api.createAnnotationStreamToken(activeDocId)
-        if (cancelled) return
-        const url = `${API_BASE_URL}/annotations/stream/doc/${activeDocId}?token=${encodeURIComponent(streamToken)}`
-        const es = new EventSource(url)
-        sseRef.current = es
-
-        const onCreated = (e: MessageEvent) => {
-          try {
-            const payload = JSON.parse(e.data) as CommentCreatedEvent
-            setAnnotations((prev) =>
-              prev.map((a) => {
-                if (a.id !== payload.annotationId) return a
-                const existing = (a.comments || []).some((c) => c.id === payload.comment.id)
-                if (existing) return a
-                return { ...a, comments: [...(a.comments || []), payload.comment] }
-              })
-            )
-          } catch {}
-        }
-
-        const onUpdated = (e: MessageEvent) => {
-          try {
-            const payload = JSON.parse(e.data) as CommentUpdatedEvent
-            setAnnotations((prev) =>
-              prev.map((a) => {
-                if (a.id !== payload.annotationId) return a
-                return {
-                  ...a,
-                  comments: (a.comments || []).map((c) => (c.id === payload.comment.id ? payload.comment : c)),
-                }
-              })
-            )
-          } catch {}
-        }
-
-        const onDeleted = (e: MessageEvent) => {
-          try {
-            const payload = JSON.parse(e.data) as CommentDeletedEvent
-            setAnnotations((prev) =>
-              prev.map((a) => {
-                if (a.id !== payload.annotationId) return a
-                return { ...a, comments: (a.comments || []).filter((c) => c.id !== payload.commentId) }
-              })
-            )
-          } catch {}
-        }
-
-        es.addEventListener("comment_created", onCreated as any)
-        es.addEventListener("comment_updated", onUpdated as any)
-        es.addEventListener("comment_deleted", onDeleted as any)
-
-        es.onerror = () => {
-          // Reconnect by fetching a fresh stream token (old one may have expired).
-          es.close()
-          if (cancelled) return
-          // small delay to avoid tight loops
-          setTimeout(() => {
-            if (!cancelled) connect()
-          }, 1000)
-        }
-
-        return () => {
-          es.removeEventListener("comment_created", onCreated as any)
-          es.removeEventListener("comment_updated", onUpdated as any)
-          es.removeEventListener("comment_deleted", onDeleted as any)
-          es.close()
-        }
-      } catch {
-        // If token creation fails (e.g., auth expired), just stop streaming.
-      }
+    const onAnnotationUpdated = (annotation: TextAnnotation) => {
+      if (annotation.docId !== activeDocId) return
+      setAnnotations((prev) => prev.map((a) => (a.id === annotation.id ? annotation : a)))
     }
 
-    let cleanup: void | (() => void)
-    connect().then((c) => {
-      cleanup = c
-    })
+    const onAnnotationDeleted = ({ id, docId }: { id: string; docId: string }) => {
+      if (docId !== activeDocId) return
+      setAnnotations((prev) => prev.filter((a) => a.id !== id))
+    }
+
+    const onCommentCreated = (payload: CommentCreatedEvent) => {
+      setAnnotations((prev) =>
+        prev.map((a) => {
+          if (a.id !== payload.annotationId) return a
+          const existing = (a.comments || []).some((c) => c.id === payload.comment.id)
+          if (existing) return a
+          return { ...a, comments: [...(a.comments || []), payload.comment] }
+        })
+      )
+    }
+
+    const onCommentUpdated = (payload: CommentUpdatedEvent) => {
+      setAnnotations((prev) =>
+        prev.map((a) => {
+          if (a.id !== payload.annotationId) return a
+          return {
+            ...a,
+            comments: (a.comments || []).map((c) => (c.id === payload.comment.id ? payload.comment : c)),
+          }
+        })
+      )
+    }
+
+    const onCommentDeleted = (payload: CommentDeletedEvent) => {
+      setAnnotations((prev) =>
+        prev.map((a) => {
+          if (a.id !== payload.annotationId) return a
+          return { ...a, comments: (a.comments || []).filter((c) => c.id !== payload.commentId) }
+        })
+      )
+    }
+
+    socket.on("annotation_created", onAnnotationCreated)
+    socket.on("annotation_updated", onAnnotationUpdated)
+    socket.on("annotation_deleted", onAnnotationDeleted)
+    socket.on("comment_created", onCommentCreated)
+    socket.on("comment_updated", onCommentUpdated)
+    socket.on("comment_deleted", onCommentDeleted)
 
     return () => {
-      cancelled = true
-      if (cleanup) cleanup()
-      if (sseRef.current) {
-        sseRef.current.close()
-        sseRef.current = null
-      }
+      socket.off("annotation_created", onAnnotationCreated)
+      socket.off("annotation_updated", onAnnotationUpdated)
+      socket.off("annotation_deleted", onAnnotationDeleted)
+      socket.off("comment_created", onCommentCreated)
+      socket.off("comment_updated", onCommentUpdated)
+      socket.off("comment_deleted", onCommentDeleted)
     }
-  }, [API_BASE_URL, activeDocId])
+  }, [socket, activeDocId])
 
   const addLabel = async (projectId: string, name: string, color: string) => {
     try {
@@ -250,53 +215,97 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
   }
 
   const editAnnotation = async (id: string, content: string, labelId?: string) => {
+    const originalAnn = annotations.find(a => a.id === id)
+    setAnnotations((prev) => prev.map((a) => (a.id === id ? { ...a, content, labelId: labelId ?? a.labelId } : a)))
     try {
       const updated = await api.updateAnnotation(id, content, labelId)
       setAnnotations((prev) => prev.map((a) => (a.id === id ? updated : a)))
     } catch (err: unknown) {
+      if (originalAnn) {
+        setAnnotations((prev) => prev.map((a) => (a.id === id ? originalAnn : a)))
+      }
       setError(err instanceof Error ? err.message : "Failed to update annotation")
       throw err
     }
   }
 
   const removeAnnotation = async (id: string) => {
+    const originalAnn = annotations.find(a => a.id === id)
+    setAnnotations((prev) => prev.filter((a) => a.id !== id))
     try {
       await api.deleteAnnotation(id)
-      setAnnotations((prev) => prev.filter((a) => a.id !== id))
     } catch (err: unknown) {
+      if (originalAnn) {
+        setAnnotations((prev) => [...prev, originalAnn])
+      }
       setError(err instanceof Error ? err.message : "Failed to delete annotation")
       throw err
     }
   }
 
   const addComment = async (annotationId: string, content: string) => {
+    const tempId = `temp-comment-${Date.now()}`
+    const tempComment = {
+      id: tempId,
+      annotationId,
+      userId: "",
+      content,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      user: { username: "Posting..." }
+    }
+    
+    setAnnotations((prev) => prev.map((a) => {
+      if (a.id === annotationId) {
+        return { ...a, comments: [...(a.comments || []), tempComment as any] }
+      }
+      return a
+    }))
+
     try {
       const newComment = await api.createAnnotationComment(annotationId, content)
       setAnnotations((prev) => prev.map((a) => {
         if (a.id === annotationId) {
-          const existing = (a.comments || []).some((c) => c.id === newComment.id)
-          if (existing) return a
-          return { ...a, comments: [...(a.comments || []), newComment] }
+          return { ...a, comments: (a.comments || []).map(c => c.id === tempId ? newComment : c) }
         }
         return a
       }))
     } catch (err: unknown) {
+      setAnnotations((prev) => prev.map((a) => {
+        if (a.id === annotationId) {
+          return { ...a, comments: (a.comments || []).filter(c => c.id !== tempId) }
+        }
+        return a
+      }))
       setError(err instanceof Error ? err.message : "Failed to create reply")
       throw err
     }
   }
 
   const removeComment = async (annotationId: string, commentId: string) => {
+    let originalComment: any;
+    setAnnotations((prev) =>
+      prev.map((a) => {
+        if (a.id !== annotationId) return a
+        const comments = a.comments || []
+        originalComment = comments.find(c => c.id === commentId)
+        return { ...a, comments: comments.filter((c) => c.id !== commentId) }
+      })
+    )
+
     try {
       await api.deleteAnnotationComment(commentId)
-      // Optimistic local update (SSE will also broadcast to other clients)
-      setAnnotations((prev) =>
-        prev.map((a) => {
-          if (a.id !== annotationId) return a
-          return { ...a, comments: (a.comments || []).filter((c) => c.id !== commentId) }
-        })
-      )
     } catch (err: unknown) {
+      if (originalComment) {
+        setAnnotations((prev) =>
+          prev.map((a) => {
+            if (a.id !== annotationId) return a
+            const arr = [...(a.comments || []), originalComment]
+            arr.sort((x, y) => x.createdAt.localeCompare(y.createdAt))
+            return { ...a, comments: arr }
+          })
+        )
+      }
       setError(err instanceof Error ? err.message : "Failed to delete reply")
       throw err
     }
