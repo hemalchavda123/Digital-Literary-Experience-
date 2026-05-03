@@ -8,7 +8,7 @@ import { SocketProvider } from '@/context/SocketContext'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Digital Literary Experience',
+  title: 'Exegesis',
   description: 'A platform for literary enthusiasts',
 }
 

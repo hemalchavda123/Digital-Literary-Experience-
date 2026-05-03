@@ -285,7 +285,7 @@ export default function Signup2(): JSX.Element {
                 color: "#000",
               }}
             >
-              Digital Literary Studio
+              Exegesis
             </h2>
 
             <p
