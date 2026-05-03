@@ -178,28 +178,114 @@ export const removeProjectMember = async (req: Request, res: Response): Promise<
     const projectId = req.params.projectId as string;
     const memberId = req.params.memberId as string;
 
-    // Only owner can remove
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, ownerId: userId },
+    // Execute all operations in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Only owner can remove
+      const project = await tx.project.findFirst({
+        where: { id: projectId, ownerId: userId },
+      });
+
+      if (!project) {
+        throw new Error('PROJECT_NOT_FOUND');
+      }
+
+      // Verify member exists
+      const member = await tx.projectMember.findUnique({
+        where: {
+          projectId_userId: {
+            projectId,
+            userId: memberId,
+          },
+        },
+      });
+
+      if (!member) {
+        throw new Error('MEMBER_NOT_FOUND');
+      }
+
+      // Prevent owner self-removal
+      if (memberId === project.ownerId) {
+        throw new Error('CANNOT_REMOVE_OWNER');
+      }
+
+      // 4. Fetch all document IDs for the project
+      const projectDocuments = await tx.document.findMany({
+        where: { projectId },
+        select: { id: true },
+      });
+      const docIds = projectDocuments.map(doc => doc.id);
+
+      // 5. Delete Annotation_Comments (project-scoped)
+      const deletedComments = await tx.annotationComment.deleteMany({
+        where: {
+          userId: memberId,
+          annotation: {
+            docId: { in: docIds },
+          },
+        },
+      });
+
+      // 6. Delete Annotations (project-scoped)
+      const deletedAnnotations = await tx.annotation.deleteMany({
+        where: {
+          userId: memberId,
+          docId: { in: docIds },
+        },
+      });
+
+      // 7. Delete Labels (project-scoped)
+      const deletedLabels = await tx.label.deleteMany({
+        where: {
+          userId: memberId,
+          projectId,
+        },
+      });
+
+      await tx.projectMember.delete({
+        where: {
+          projectId_userId: {
+            projectId,
+            userId: memberId,
+          },
+        },
+      });
+
+      return {
+        labels: deletedLabels.count,
+        annotations: deletedAnnotations.count,
+        comments: deletedComments.count,
+      };
     });
 
-    if (!project) {
+    // Log the operation at INFO level
+    console.info(`Member removed from project. ProjectId: ${projectId}, MemberId: ${memberId}, RequestedBy: ${userId}, Deleted: ${JSON.stringify(result)}`);
+
+    res.json({
+      message: 'Member removed successfully',
+      deleted: result,
+    });
+  } catch (error: any) {
+    const userId = req.user?.userId;
+    const projectId = req.params.projectId as string;
+    const memberId = req.params.memberId as string;
+    
+    // Log error at ERROR level with stack trace
+    console.error(`Error removing member from project. ProjectId: ${projectId}, MemberId: ${memberId}, RequestedBy: ${userId}, Error: ${error.message}`, error.stack);
+
+    // Handle specific error cases
+    if (error.message === 'PROJECT_NOT_FOUND') {
       res.status(404).json({ error: 'Project not found or unauthorized' });
       return;
     }
+    if (error.message === 'MEMBER_NOT_FOUND') {
+      res.status(404).json({ error: 'Member not found' });
+      return;
+    }
+    if (error.message === 'CANNOT_REMOVE_OWNER') {
+      res.status(400).json({ error: 'Cannot remove project owner' });
+      return;
+    }
 
-    await prisma.projectMember.delete({
-      where: {
-        projectId_userId: {
-          projectId,
-          userId: memberId,
-        },
-      },
-    });
-
-    res.json({ message: 'Member removed successfully' });
-  } catch (error) {
-    console.error('Error removing member:', error);
     res.status(500).json({ error: 'Failed to remove member' });
   }
 };

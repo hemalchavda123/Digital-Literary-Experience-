@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import userService from '../services/userService';
 import passwordService from '../services/passwordService';
 import { jwtService } from '../services/jwtService';
+import emailService from '../services/emailService';
 
 /**
  * AuthController handles authentication-related HTTP requests
@@ -321,9 +322,10 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
     // Store hashed token in database
     await userService.setResetToken(user.id, resetTokenHash, expiry);
 
-    // TODO: Send email with reset token
-    // For now, we'll just log it (in production, this would be sent via email)
-    // console.log(`Password reset token for ${email}: ${resetToken}`);
+    // Send email with reset token
+    // Determine origin (frontend URL) from request headers, fallback to localhost
+    const origin = req.headers.origin || 'http://localhost:3000';
+    await emailService.sendPasswordResetEmail(email, resetToken, origin);
 
     res.json({ message: 'If the email exists, a password reset link has been sent' });
   } catch (error) {
