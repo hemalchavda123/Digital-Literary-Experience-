@@ -1,8 +1,3 @@
--- AlterTable
-ALTER TABLE "ProjectInvite" ADD COLUMN "email" TEXT,
-ADD COLUMN "invitedBy" TEXT,
-ADD COLUMN "status" TEXT NOT NULL DEFAULT 'PENDING';
-
 -- CreateTable
 CREATE TABLE "Announcement" (
     "id" TEXT NOT NULL,
@@ -52,9 +47,6 @@ CREATE TABLE "AssignmentStatus" (
 
     CONSTRAINT "AssignmentStatus_pkey" PRIMARY KEY ("id")
 );
-
--- CreateIndex
-CREATE INDEX "ProjectInvite_email_idx" ON "ProjectInvite"("email");
 
 -- CreateIndex
 CREATE INDEX "Announcement_projectId_idx" ON "Announcement"("projectId");
