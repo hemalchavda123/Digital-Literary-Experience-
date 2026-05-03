@@ -155,14 +155,25 @@ export function ShareModal({ isOpen, onClose, projectId, isOwner = false }: Prop
       const member = members.find(m => m.userId === memberId)
       if (!member) return
       
+      const updatedValue = !member[permission]
       const updatedPermissions = {
-        [permission]: !member[permission]
+        [permission]: updatedValue
       }
       
-      await updateMemberPermissions(projectId, memberId, updatedPermissions)
+      // Optimistically update UI
       setMembers(prev => prev.map(m => m.userId === memberId ? { ...m, ...updatedPermissions } : m))
+      
+      await updateMemberPermissions(projectId, memberId, updatedPermissions)
     } catch (err: any) {
       setError(err.message || "Failed to update permissions")
+      // Revert UI on error
+      setMembers(prev => prev.map(m => {
+        if (m.userId === memberId) {
+          const member = members.find(orig => orig.userId === memberId)
+          return member ? { ...m, [permission]: member[permission] } : m
+        }
+        return m
+      }))
     }
   }
 

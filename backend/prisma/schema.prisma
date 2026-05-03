@@ -133,6 +133,9 @@ model ProjectInvite {
   projectId String
   token     String    @unique @default(uuid())
   role      Role      @default(VIEWER)
+  email     String?
+  invitedBy String?
+  status    String    @default("PENDING") // PENDING, ACCEPTED, EXPIRED
   createdAt DateTime  @default(now())
   expiresAt DateTime?
 
@@ -140,6 +143,7 @@ model ProjectInvite {
 
   @@index([projectId])
   @@index([token])
+  @@index([email])
 }
 
 model AnnotationComment {
