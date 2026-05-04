@@ -17,12 +17,13 @@ export async function createAssignment(
   title: string,
   description: string,
   dueDate?: string,
-  totalMarks?: number
+  totalMarks?: number,
+  documentId?: string
 ): Promise<Assignment> {
   const response = await authFetch(`${API_URL}/projects/${projectId}/assignments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title, description, dueDate, totalMarks }),
+    body: JSON.stringify({ title, description, dueDate, totalMarks, documentId }),
   })
   if (!response.ok) {
     const error = await response.json().catch(() => ({}))

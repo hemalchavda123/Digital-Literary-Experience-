@@ -123,6 +123,20 @@ function AssignmentItem({
         <p className="text-sm text-gray-900 whitespace-pre-wrap">{assignment.description}</p>
       )}
 
+      {/* Linked Document */}
+      {assignment.document && (
+        <a
+          href={`/document/${assignment.document.id}`}
+          className="inline-flex items-center gap-2 text-sm text-[#a17038] hover:text-[#8a5f2e] font-medium transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+          </svg>
+          {assignment.document.title}
+        </a>
+      )}
+
       {/* Actions row */}
       <div className="mt-1 flex items-center gap-4">
         {/* Member: Submit / Unsubmit */}
@@ -250,13 +264,15 @@ interface Props {
 }
 
 export function AssignmentList({ projectId, isOwner, currentUserId }: Props) {
-  const { assignmentsForProject, createAssignment } = useProjects()
+  const { assignmentsForProject, createAssignment, documentsForProject } = useProjects()
   const assignments = assignmentsForProject(projectId)
+  const documents = documentsForProject(projectId)
 
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [dueDate, setDueDate] = useState("")
   const [totalMarks, setTotalMarks] = useState("")
+  const [documentId, setDocumentId] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -269,12 +285,14 @@ export function AssignmentList({ projectId, isOwner, currentUserId }: Props) {
         title.trim(),
         description.trim(),
         dueDate || undefined,
-        totalMarks ? parseInt(totalMarks, 10) : undefined
+        totalMarks ? parseInt(totalMarks, 10) : undefined,
+        documentId || undefined
       )
       setTitle("")
       setDescription("")
       setDueDate("")
       setTotalMarks("")
+      setDocumentId("")
     } catch (error) {
       console.error("Failed to create assignment", error)
     } finally {
@@ -311,6 +329,22 @@ export function AssignmentList({ projectId, isOwner, currentUserId }: Props) {
           />
 
           <div className="flex items-start gap-4">
+            <div className="flex flex-col gap-1 flex-1">
+              <label className="text-xs text-gray-500 font-medium">Link document (optional)</label>
+              <select
+                value={documentId}
+                onChange={(e) => setDocumentId(e.target.value)}
+                className="text-sm border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-black bg-white text-[#0f120f]"
+                disabled={isSubmitting}
+              >
+                <option value="">No document</option>
+                {documents.map((doc) => (
+                  <option key={doc.id} value={doc.id}>
+                    {doc.title}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs text-gray-500 font-medium">Due date (optional)</label>
               <input

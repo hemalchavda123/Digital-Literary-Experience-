@@ -12,6 +12,12 @@ export interface AssignmentStatus {
 export interface Assignment {
   id: string
   projectId: string
+  documentId?: string | null
+  document?: {
+    id: string
+    title: string
+    kind: string
+  } | null
   title: string
   description: string
   dueDate: string | null

@@ -35,7 +35,7 @@ type ProjectContextValue = {
   removeReplyFromAnnouncement: (projectId: string, announcementId: string, replyId: string) => Promise<void>
   assignmentsForProject: (projectId: string) => Assignment[]
   fetchAssignments: (projectId: string) => Promise<Assignment[]>
-  createAssignment: (projectId: string, title: string, description: string, dueDate?: string, totalMarks?: number) => Promise<Assignment>
+  createAssignment: (projectId: string, title: string, description: string, dueDate?: string, totalMarks?: number, documentId?: string) => Promise<Assignment>
   deleteAssignment: (projectId: string, assignmentId: string) => Promise<void>
   updateAssignmentStatus: (projectId: string, assignmentId: string, userId: string, status?: string, grade?: string) => Promise<void>
 }
@@ -660,11 +660,13 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       }
     },
 
-    createAssignment: async (projectId, title, description, dueDate, totalMarks) => {
+    createAssignment: async (projectId, title, description, dueDate, totalMarks, documentId) => {
       const tempId = `temp-assignment-${Date.now()}`
       const optimistic: Assignment = {
         id: tempId,
         projectId,
+        documentId: documentId ?? null,
+        document: documentId ? undefined : null,
         title,
         description,
         dueDate: dueDate ?? null,
@@ -678,7 +680,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         [projectId]: [optimistic, ...(prev[projectId] ?? [])],
       }))
       try {
-        const item = await assignmentApi.createAssignment(projectId, title, description, dueDate, totalMarks)
+        const item = await assignmentApi.createAssignment(projectId, title, description, dueDate, totalMarks, documentId)
         setAssignmentCache((prev) => ({
           ...prev,
           [projectId]: (prev[projectId] ?? []).map((a) => (a.id === tempId ? item : a)),

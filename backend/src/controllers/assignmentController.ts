@@ -33,6 +33,13 @@ export const getAssignments = async (req: Request, res: Response): Promise<void>
       where: { projectId },
       orderBy: { createdAt: 'desc' },
       include: {
+        document: {
+          select: {
+            id: true,
+            title: true,
+            kind: true
+          }
+        },
         statuses: {
           // Owner sees all statuses; members only see their own
           where: isOwner ? {} : { userId },
@@ -57,7 +64,7 @@ export const createAssignment = async (req: Request, res: Response): Promise<voi
     }
 
     const projectId = req.params.projectId as string;
-    const { title, description, dueDate, totalMarks } = req.body;
+    const { title, description, dueDate, totalMarks, documentId } = req.body;
 
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
       res.status(400).json({ error: 'Assignment title is required' });
@@ -74,12 +81,25 @@ export const createAssignment = async (req: Request, res: Response): Promise<voi
       return;
     }
 
+    // If documentId is provided, verify it belongs to this project
+    if (documentId) {
+      const document = await prisma.document.findFirst({
+        where: { id: documentId, projectId }
+      });
+
+      if (!document) {
+        res.status(400).json({ error: 'Document not found in this project' });
+        return;
+      }
+    }
+
     // Only project members (not the owner) get statuses
     const memberIds = project.members.map((m) => m.userId);
 
     const assignment = await prisma.assignment.create({
       data: {
         projectId,
+        documentId: documentId || null,
         title: title.trim(),
         description: description?.trim() || "",
         dueDate: dueDate ? new Date(dueDate) : null,
@@ -92,6 +112,13 @@ export const createAssignment = async (req: Request, res: Response): Promise<voi
         }
       },
       include: {
+        document: {
+          select: {
+            id: true,
+            title: true,
+            kind: true
+          }
+        },
         statuses: {
           include: { user: { select: { username: true } } }
         }
