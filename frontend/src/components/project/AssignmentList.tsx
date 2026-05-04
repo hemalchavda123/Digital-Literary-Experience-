@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useProjects } from "@/context/ProjectContext"
 import type { Assignment } from "@/types/assignment"
+import { DocumentCard } from "./DocumentCard"
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: "bg-gray-100 text-gray-500",
@@ -125,16 +126,9 @@ function AssignmentItem({
 
       {/* Linked Document */}
       {assignment.document && (
-        <a
-          href={`/document/${assignment.document.id}`}
-          className="inline-flex items-center gap-2 text-sm text-[#a17038] hover:text-[#8a5f2e] font-medium transition-colors"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-          </svg>
-          {assignment.document.title}
-        </a>
+        <div className="mt-2">
+          <DocumentCard document={assignment.document} compact={true} />
+        </div>
       )}
 
       {/* Actions row */}
