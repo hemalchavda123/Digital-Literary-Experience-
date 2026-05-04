@@ -447,14 +447,9 @@ export const inviteUserByEmail = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    // Verify ownership and get project details
+    // Verify ownership
     const project = await prisma.project.findFirst({
       where: { id: projectId, ownerId: currentUserId },
-      include: {
-        owner: {
-          select: { username: true, email: true }
-        }
-      }
     });
 
     if (!project) {
@@ -462,104 +457,52 @@ export const inviteUserByEmail = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    // Get current user details
-    const currentUser = await prisma.user.findUnique({
-      where: { id: currentUserId },
-      select: { username: true, email: true }
+    // Check if user exists with this email
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
     });
 
-    if (!currentUser) {
-      res.status(404).json({ error: 'Current user not found' });
+    if (!user) {
+      res.status(404).json({ error: 'No user found with this email' });
       return;
     }
 
-    const normalizedEmail = email.toLowerCase();
-
-    // Check if user exists with this email
-    const user = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
-    });
-
-    if (user) {
-      // User exists - check if they're already a member
-      if (user.id === currentUserId) {
-        res.status(400).json({ error: 'Cannot invite yourself' });
-        return;
-      }
-
-      const existingMember = await prisma.projectMember.findUnique({
-        where: {
-          projectId_userId: {
-            projectId,
-            userId: user.id,
-          },
-        },
-      });
-
-      if (existingMember) {
-        res.status(400).json({ error: 'User is already a member of this project' });
-        return;
-      }
+    if (user.id === currentUserId) {
+      res.status(400).json({ error: 'Cannot invite yourself' });
+      return;
     }
 
-    // Check if there's already a pending invite for this email
-    const existingInvite = await prisma.projectInvite.findFirst({
+    // Check if already a member
+    const existingMember = await prisma.projectMember.findUnique({
       where: {
-        projectId,
-        email: normalizedEmail,
-        status: 'PENDING',
+        projectId_userId: {
+          projectId,
+          userId: user.id,
+        },
       },
     });
 
-    if (existingInvite) {
-      res.status(400).json({ error: 'An invitation has already been sent to this email' });
+    if (existingMember) {
+      res.status(400).json({ error: 'User is already a member of this project' });
       return;
     }
 
     const validRole = role === 'EDITOR' ? 'EDITOR' : 'VIEWER';
 
-    // Create a pending invite
-    const invite = await prisma.projectInvite.create({
+    const member = await prisma.projectMember.create({
       data: {
         projectId,
+        userId: user.id,
         role: validRole,
-        email: normalizedEmail,
-        invitedBy: currentUserId,
-        status: 'PENDING',
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      },
+      include: {
+        user: {
+          select: { id: true, username: true, email: true },
+        },
       },
     });
 
-    // Construct invite link
-    const inviteLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/invite/${invite.token}`;
-
-    // Send email notification
-    try {
-      await sendProjectInviteEmail({
-        to: normalizedEmail,
-        projectName: project.name,
-        inviterName: currentUser.username,
-        inviteLink,
-      });
-
-      res.status(201).json({ 
-        message: 'Invitation sent successfully',
-        email: normalizedEmail,
-        inviteId: invite.id
-      });
-    } catch (emailError: any) {
-      console.error('Error sending invitation email:', emailError);
-      
-      // Delete the invite if email fails
-      await prisma.projectInvite.delete({
-        where: { id: invite.id },
-      });
-
-      res.status(500).json({ 
-        error: 'Failed to send invitation email. Please check your email configuration.',
-        details: emailError.message
-      });
-    }
+    res.status(201).json(member);
   } catch (error) {
     console.error('Error inviting user by email:', error);
     res.status(500).json({ error: 'Failed to invite user' });
