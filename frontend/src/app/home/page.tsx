@@ -9,8 +9,9 @@ import { ProjectGrid } from "@/components/dashboard/ProjectGrid"
 import { CreateProjectModal } from "@/components/dashboard/CreateProjectModal"
 import { useProjects } from "@/context/ProjectContext"
 import { getCurrentUser } from "@/lib/api/authFetch"
+import type { User } from "@/types/project"
 
-function sortProjects(projects: ReturnType<typeof useProjects>["projects"], filter: "all" | "recent" | "alphabetical") {
+function sortProjects(projects: ReturnType<typeof useProjects>["projects"], filter: string) {
   const copy = [...projects]
   if (filter === "recent") {
     copy.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -24,9 +25,10 @@ export default function HomePage() {
   const router = useRouter()
   const { projects, loading, refreshProjects } = useProjects()
   const [searchQuery, setSearchQuery] = useState("")
-  const [filter, setFilter] = useState<"all" | "recent" | "alphabetical">("all")
+  const [filter, setFilter] = useState<string>("all")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
 
   useEffect(() => {
@@ -40,6 +42,7 @@ export default function HomePage() {
           return
         }
         setIsAuthenticated(true)
+        setCurrentUser(user as User)
         // Refresh projects after auth is confirmed
         refreshProjects()
       } catch (error) {
@@ -66,9 +69,18 @@ export default function HomePage() {
     return null
   }
 
-  const filtered = sortProjects(projects, filter).filter((project) =>
-    project.name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filtered = sortProjects(projects, filter).filter((project) => {
+    const matchesSearch = project.name.toLowerCase().includes(searchQuery.toLowerCase())
+    if (!matchesSearch) return false
+
+    if (filter === "owned") {
+      return project.ownerId === currentUser?.id
+    }
+    if (filter === "not_owned") {
+      return project.ownerId !== currentUser?.id
+    }
+    return true
+  })
 
   return (
     <div className="min-h-screen w-full bg-white flex flex-col">
