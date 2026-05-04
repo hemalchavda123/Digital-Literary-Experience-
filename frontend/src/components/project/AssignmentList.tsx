@@ -125,17 +125,17 @@ function AssignmentItem({
       )}
 
       {/* Linked Document Button */}
-      {assignment.document && (
+      {(assignment.document || assignment.documentId) && (
         <div className="mt-3">
           <Link
-            href={`/document/${assignment.document.id}`}
+            href={`/document/${assignment.document?.id || assignment.documentId}`}
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#a17038] hover:bg-[#8a5f2e] rounded-md transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
               <polyline points="14 2 14 8 20 8"></polyline>
             </svg>
-            View Document: {assignment.document.title}
+            View Document{assignment.document?.title ? `: ${assignment.document.title}` : ''}
           </Link>
         </div>
       )}
