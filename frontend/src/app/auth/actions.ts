@@ -111,5 +111,5 @@ export async function logout() {
     cookieStore.delete('refreshToken')
     
     revalidatePath('/', 'layout')
-    redirect('/login')
+    redirect('/signup2')
 }
