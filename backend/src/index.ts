@@ -13,6 +13,7 @@ import projectMemberRoutes from './routes/projectMemberRoutes';
 import userRoutes from './routes/userRoutes';
 import announcementRoutes from './routes/announcementRoutes';
 import assignmentRoutes from './routes/assignmentRoutes';
+import quizRoutes from './routes/quizRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { initSocket } from './socket';
 
@@ -87,6 +88,7 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/projects', projectMemberRoutes);
 app.use('/api/projects/:projectId/announcements', announcementRoutes);
 app.use('/api/projects/:projectId/assignments', assignmentRoutes);
+app.use('/api/projects/:projectId/quizzes', quizRoutes);
 app.use('/api/documents', documentRoutes);
 
 // Error handling middleware (must be last)

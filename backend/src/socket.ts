@@ -12,7 +12,7 @@ export const initSocket = (server: HttpServer) => {
 
   io = new Server(server, {
     cors: {
-      origin: (origin, cb) => {
+      origin: (origin: string | undefined, cb: (err: Error | null, success?: boolean) => void) => {
         if (!origin) return cb(null, true);
         if (allowedOrigins.includes(origin)) return cb(null, true);
         if (origin.match(/^https:\/\/digital-literary-experience.*\.vercel\.app$/)) return cb(null, true);
@@ -24,7 +24,7 @@ export const initSocket = (server: HttpServer) => {
   });
 
   // Optional: Add authentication middleware
-  io.use((socket, next) => {
+  io.use((socket: Socket, next: (err?: any) => void) => {
     const token = socket.handshake.auth.token || socket.handshake.headers['authorization']?.replace('Bearer ', '');
     if (!token) {
       return next();

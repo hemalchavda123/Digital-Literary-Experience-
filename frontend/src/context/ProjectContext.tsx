@@ -5,9 +5,11 @@ import type { Project } from "@/types/project"
 import type { Document } from "@/types/document"
 import type { Announcement } from "@/types/announcement"
 import type { Assignment } from "@/types/assignment"
+import type { Quiz } from "@/types/quiz"
 import * as api from "@/lib/api/projects"
 import * as announcementApi from "@/lib/api/announcements"
 import * as assignmentApi from "@/lib/api/assignments"
+import * as quizApi from "@/lib/api/quizzes"
 import { useSocket } from "@/context/SocketContext"
 
 type ProjectContextValue = {
@@ -38,6 +40,11 @@ type ProjectContextValue = {
   createAssignment: (projectId: string, title: string, description: string, dueDate?: string, totalMarks?: number, documentId?: string) => Promise<Assignment>
   deleteAssignment: (projectId: string, assignmentId: string) => Promise<void>
   updateAssignmentStatus: (projectId: string, assignmentId: string, userId: string, status?: string, grade?: string) => Promise<void>
+  quizzesForProject: (projectId: string) => Quiz[]
+  fetchQuizzes: (projectId: string) => Promise<Quiz[]>
+  createQuiz: (projectId: string, payload: { title: string; description: string; status: string; questions: any[] }) => Promise<Quiz>
+  updateQuiz: (projectId: string, quizId: string, payload: { title: string; description: string; status: string; questions?: any[] }) => Promise<Quiz>
+  deleteQuiz: (projectId: string, quizId: string) => Promise<void>
 }
 
 const ProjectContext = createContext<ProjectContextValue | undefined>(undefined)
@@ -53,6 +60,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [documentCache, setDocumentCache] = useState<Record<string, Document[]>>({})
   const [announcementCache, setAnnouncementCache] = useState<Record<string, Announcement[]>>({})
   const [assignmentCache, setAssignmentCache] = useState<Record<string, Assignment[]>>({})
+  const [quizCache, setQuizCache] = useState<Record<string, Quiz[]>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const tokenRef = useRef<string | null>(null)
@@ -731,7 +739,57 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       })
     },
 
-  }), [projects, documentCache, announcementCache, assignmentCache, loading, error, refreshProjects, joinProject, leaveProject])
+    quizzesForProject: (projectId) => quizCache[projectId] ?? [],
+
+    fetchQuizzes: async (projectId) => {
+      try {
+        const items = await quizApi.getQuizzes(projectId)
+        setQuizCache((prev) => ({ ...prev, [projectId]: items }))
+        return items
+      } catch (err: any) {
+        return []
+      }
+    },
+
+    createQuiz: async (projectId, payload) => {
+      try {
+        const item = await quizApi.createQuiz(projectId, payload)
+        setQuizCache((prev) => ({
+          ...prev,
+          [projectId]: [item, ...(prev[projectId] ?? [])],
+        }))
+        return item
+      } catch (error) {
+        throw error
+      }
+    },
+
+    updateQuiz: async (projectId, quizId, payload) => {
+      try {
+        const item = await quizApi.updateQuiz(projectId, quizId, payload)
+        setQuizCache((prev) => ({
+          ...prev,
+          [projectId]: (prev[projectId] ?? []).map((q) => (q.id === quizId ? item : q)),
+        }))
+        return item
+      } catch (error) {
+        throw error
+      }
+    },
+
+    deleteQuiz: async (projectId, quizId) => {
+      try {
+        await quizApi.deleteQuiz(projectId, quizId)
+        setQuizCache((prev) => ({
+          ...prev,
+          [projectId]: (prev[projectId] ?? []).filter((q) => q.id !== quizId),
+        }))
+      } catch (error) {
+        throw error
+      }
+    },
+
+  }), [projects, documentCache, announcementCache, assignmentCache, quizCache, loading, error, refreshProjects, joinProject, leaveProject])
 
   return <ProjectContext.Provider value={contextValue}>{children}</ProjectContext.Provider>
 }
