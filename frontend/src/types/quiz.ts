@@ -11,6 +11,7 @@ export interface QuizQuestion {
   order: number;
   marks: number;
   correctAnswer: string | null;
+  isPublished: boolean;
 }
 
 export interface Quiz {

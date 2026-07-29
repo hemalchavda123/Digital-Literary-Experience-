@@ -6,6 +6,7 @@ import type { Quiz } from "@/types/quiz"
 import { CreateQuizModal } from "./CreateQuizModal"
 import { QuizTakeModal } from "./QuizTakeModal"
 import { QuizSubmissionsModal } from "./QuizSubmissionsModal"
+import { ManageQuizModal } from "./ManageQuizModal"
 
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-500",
@@ -36,6 +37,7 @@ function QuizItem({
   const { deleteQuiz, updateQuiz } = useProjects()
   const [takeModalOpen, setTakeModalOpen] = useState(false)
   const [submissionsModalOpen, setSubmissionsModalOpen] = useState(false)
+  const [manageModalOpen, setManageModalOpen] = useState(false)
 
   const handlePublish = async () => {
     if (window.confirm(`Publish quiz "${quiz.title}"? Project members will be able to take it.`)) {
@@ -101,6 +103,12 @@ function QuizItem({
               </button>
             )}
             <button
+              onClick={() => setManageModalOpen(true)}
+              className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+            >
+              Manage Quiz
+            </button>
+            <button
               onClick={() => setSubmissionsModalOpen(true)}
               className="text-xs font-medium text-gray-500 hover:text-gray-800 transition-colors"
             >
@@ -130,6 +138,14 @@ function QuizItem({
           quiz={quiz}
           projectId={projectId}
           onClose={() => setSubmissionsModalOpen(false)}
+        />
+      )}
+
+      {manageModalOpen && (
+        <ManageQuizModal
+          quizId={quiz.id}
+          projectId={projectId}
+          onClose={() => setManageModalOpen(false)}
         />
       )}
     </div>

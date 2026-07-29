@@ -256,10 +256,11 @@ model QuizQuestion {
   quizId      String
   type        QuestionType
   questionText String
-  options     String?   // JSON array string for multiple choice options
+  options     String?
   order       Int       @default(0)
   marks       Int       @default(1)
   correctAnswer String? 
+  isPublished Boolean   @default(true)
 
   quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
   answers     QuizAnswer[]

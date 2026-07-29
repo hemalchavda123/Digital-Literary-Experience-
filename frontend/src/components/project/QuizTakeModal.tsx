@@ -121,7 +121,7 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
                             type="text"
                             value={answers[q.id] || ""}
                             onChange={(e) => handleAnswerChange(q.id, e.target.value)}
-                            className="w-full max-w-md p-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-black text-sm"
+                            className="w-full max-w-md p-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-black text-sm text-gray-900 placeholder-gray-500"
                             placeholder="Your answer..."
                           />
                         )}
@@ -130,7 +130,7 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
                           <textarea
                             value={answers[q.id] || ""}
                             onChange={(e) => handleAnswerChange(q.id, e.target.value)}
-                            className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-black min-h-[100px] resize-y text-sm"
+                            className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-black min-h-[100px] resize-y text-sm text-gray-900 placeholder-gray-500"
                             placeholder="Your answer..."
                           />
                         )}

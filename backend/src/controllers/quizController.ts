@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+
 import prisma from '../config/db';
 
 export const getQuizzes = async (req: Request, res: Response, next: NextFunction) => {
@@ -39,6 +40,7 @@ export const getQuizById = async (req: Request, res: Response, next: NextFunctio
       },
       include: {
         questions: {
+          where: isOwner ? undefined : { isPublished: true },
           orderBy: { order: 'asc' }
         }
       },
@@ -79,7 +81,8 @@ export const createQuiz = async (req: Request, res: Response, next: NextFunction
             options: q.options ? JSON.stringify(q.options) : null,
             order: i,
             marks: q.marks || 1,
-            correctAnswer: q.correctAnswer || null
+            correctAnswer: q.correctAnswer || null,
+            isPublished: q.isPublished !== undefined ? q.isPublished : true
           }))
         }
       },
@@ -125,7 +128,8 @@ export const updateQuiz = async (req: Request, res: Response, next: NextFunction
               options: q.options ? JSON.stringify(q.options) : null,
               order: i,
               marks: q.marks || 1,
-              correctAnswer: q.correctAnswer || null
+              correctAnswer: q.correctAnswer || null,
+              isPublished: q.isPublished !== undefined ? q.isPublished : true
             }))
           }
         } : {})

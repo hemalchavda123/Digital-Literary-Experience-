@@ -16,6 +16,7 @@ interface TempQuestion {
   options: string[]
   marks: number
   correctAnswer: string
+  isPublished: boolean
 }
 
 let tempQuestionIdCounter = 0
@@ -37,6 +38,7 @@ export function CreateQuizModal({ projectId, onClose }: Props) {
         options: ["Option 1", "Option 2"],
         marks: 1,
         correctAnswer: "",
+        isPublished: true,
       },
     ])
   }
@@ -100,6 +102,7 @@ export function CreateQuizModal({ projectId, onClose }: Props) {
           options: q.type === "MULTIPLE_CHOICE" ? q.options : null,
           marks: q.marks,
           correctAnswer: q.correctAnswer.trim() || null,
+          isPublished: q.isPublished,
         })),
       })
       onClose()
@@ -129,13 +132,13 @@ export function CreateQuizModal({ projectId, onClose }: Props) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Quiz Title"
-              className="w-full p-3 text-lg font-semibold border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-black"
+              className="w-full p-3 text-lg font-semibold border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-black text-gray-900 placeholder-gray-500"
             />
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Quiz Description (optional)"
-              className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-black min-h-[100px] resize-none"
+              className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-black min-h-[100px] resize-none text-gray-900 placeholder-gray-500"
             />
           </div>
 
@@ -158,6 +161,16 @@ export function CreateQuizModal({ projectId, onClose }: Props) {
             ) : (
               questions.map((q, index) => (
                 <div key={q.id} className="border border-gray-200 rounded-md p-4 bg-gray-50 relative group">
+                  <div className="absolute top-4 right-12 flex items-center gap-2">
+                    <label className="flex items-center cursor-pointer gap-2">
+                      <span className="text-xs text-gray-500 font-medium">{q.isPublished ? "Published" : "Draft"}</span>
+                      <div className="relative">
+                        <input type="checkbox" className="sr-only" checked={q.isPublished} onChange={(e) => updateQuestion(q.id, "isPublished", e.target.checked)} />
+                        <div className={`block w-10 h-6 rounded-full transition-colors ${q.isPublished ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                        <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${q.isPublished ? 'transform translate-x-4' : ''}`}></div>
+                      </div>
+                    </label>
+                  </div>
                   <button
                     onClick={() => handleRemoveQuestion(q.id)}
                     className="absolute top-4 right-4 text-gray-400 hover:text-red-600"
@@ -172,7 +185,7 @@ export function CreateQuizModal({ projectId, onClose }: Props) {
                       <select
                         value={q.type}
                         onChange={(e) => updateQuestion(q.id, "type", e.target.value as QuestionType)}
-                        className="p-2 border border-gray-300 rounded focus:outline-none bg-white text-sm"
+                        className="p-2 border border-gray-300 rounded focus:outline-none bg-white text-sm text-black"
                       >
                         <option value="MULTIPLE_CHOICE">Multiple Choice</option>
                         <option value="ONE_WORD">One Word</option>
@@ -182,7 +195,7 @@ export function CreateQuizModal({ projectId, onClose }: Props) {
                         type="number"
                         value={q.marks}
                         onChange={(e) => updateQuestion(q.id, "marks", parseInt(e.target.value) || 1)}
-                        className="w-20 p-2 border border-gray-300 rounded focus:outline-none text-sm"
+                        className="w-20 p-2 border border-gray-300 rounded focus:outline-none text-sm text-gray-900"
                         placeholder="Marks"
                         min="1"
                       />
@@ -194,7 +207,7 @@ export function CreateQuizModal({ projectId, onClose }: Props) {
                       value={q.questionText}
                       onChange={(e) => updateQuestion(q.id, "questionText", e.target.value)}
                       placeholder="Question text..."
-                      className="w-full p-2 border border-gray-300 rounded focus:outline-none ml-9"
+                      className="w-full p-2 border border-gray-300 rounded focus:outline-none ml-9 text-gray-900 placeholder-gray-500"
                     />
 
                     {q.type === "MULTIPLE_CHOICE" && (
@@ -206,7 +219,7 @@ export function CreateQuizModal({ projectId, onClose }: Props) {
                               type="text"
                               value={opt}
                               onChange={(e) => updateOption(q.id, optIndex, e.target.value)}
-                              className="flex-1 p-1 border-b border-gray-300 focus:outline-none focus:border-[#a17038] bg-transparent text-sm"
+                              className="flex-1 p-1 border-b border-gray-300 focus:outline-none focus:border-[#a17038] bg-transparent text-sm text-gray-900 placeholder-gray-500"
                             />
                             {q.options.length > 2 && (
                               <button onClick={() => removeOption(q.id, optIndex)} className="text-gray-400 hover:text-red-500">
@@ -227,7 +240,7 @@ export function CreateQuizModal({ projectId, onClose }: Props) {
                         value={q.correctAnswer}
                         onChange={(e) => updateQuestion(q.id, "correctAnswer", e.target.value)}
                         placeholder="Correct Answer (optional, for auto-grading)"
-                        className="w-full p-2 border border-gray-200 rounded focus:outline-none text-sm bg-white"
+                        className="w-full p-2 border border-gray-200 rounded focus:outline-none text-sm bg-white text-gray-900 placeholder-gray-500"
                       />
                     </div>
                   </div>
