@@ -3,9 +3,12 @@
 import { useState } from "react"
 import { useProjects } from "@/context/ProjectContext"
 import { QuestionType } from "@/types/quiz"
+import { createQuiz as apiCreateQuiz } from "@/lib/api/quizzes"
 
 interface Props {
   projectId: string
+  documentId?: string | null
+  annotationId?: string | null
   onClose: () => void
 }
 
@@ -21,8 +24,8 @@ interface TempQuestion {
 
 let tempQuestionIdCounter = 0
 
-export function CreateQuizModal({ projectId, onClose }: Props) {
-  const { createQuiz } = useProjects()
+export function CreateQuizModal({ projectId, documentId, annotationId, onClose }: Props) {
+  const { fetchQuizzes } = useProjects()
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [questions, setQuestions] = useState<TempQuestion[]>([])
@@ -92,10 +95,12 @@ export function CreateQuizModal({ projectId, onClose }: Props) {
 
     setIsSubmitting(true)
     try {
-      await createQuiz(projectId, {
+      await apiCreateQuiz(projectId, {
         title: title.trim(),
         description: description.trim(),
         status,
+        documentId: documentId || null,
+        annotationId: annotationId || null,
         questions: questions.map((q) => ({
           type: q.type,
           questionText: q.questionText,
@@ -105,6 +110,7 @@ export function CreateQuizModal({ projectId, onClose }: Props) {
           isPublished: q.isPublished,
         })),
       })
+      await fetchQuizzes(projectId)
       onClose()
     } catch (error) {
       console.error("Failed to create quiz", error)
@@ -115,10 +121,17 @@ export function CreateQuizModal({ projectId, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
         <div className="flex justify-between items-center p-5 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900">Create New Quiz</h2>
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Create Quiz</h2>
+            {(documentId || annotationId) && (
+              <span className="text-xs text-purple-700 font-semibold bg-purple-50 px-2 py-0.5 rounded">
+                Linked to PDF Annotation
+              </span>
+            )}
+          </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>

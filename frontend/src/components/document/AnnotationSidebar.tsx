@@ -3,7 +3,15 @@
 import { useEffect, useState, useMemo } from "react"
 import { TextAnnotation } from "@/types/annotation"
 import { useAnnotations } from "@/context/AnnotationContext"
-import { Trash2, Edit2, Check, X, Send, MessageSquareText, Filter, X as CloseIcon } from "lucide-react"
+import { useProjects } from "@/context/ProjectContext"
+import { getQuizzes } from "@/lib/api/quizzes"
+import type { Quiz } from "@/types/quiz"
+import { CreateQuizModal } from "@/components/project/CreateQuizModal"
+import { QuizTakeModal } from "@/components/project/QuizTakeModal"
+import { QuizSubmissionsModal } from "@/components/project/QuizSubmissionsModal"
+import { ManageQuizModal } from "@/components/project/ManageQuizModal"
+import { QuizAnalyticsModal } from "@/components/project/QuizAnalyticsModal"
+import { Trash2, Edit2, Check, X, Send, MessageSquareText, Filter, X as CloseIcon, HelpCircle, BarChart2, Plus } from "lucide-react"
 
 type Props = {
   selectedAnnotations: TextAnnotation[]
@@ -11,14 +19,36 @@ type Props = {
   documentText?: string
   getHighlightedText?: (startOffset: number, endOffset: number) => string | null
   onAnnotationHover?: (annotationId: string | null) => void
+  isOwner?: boolean
+  projectId?: string
+  docId?: string
 }
 
-export function AnnotationSidebar({ selectedAnnotations, onClose, documentText, getHighlightedText, onAnnotationHover }: Props) {
+export function AnnotationSidebar({
+  selectedAnnotations,
+  onClose,
+  documentText,
+  getHighlightedText,
+  onAnnotationHover,
+  isOwner = false,
+  projectId,
+  docId,
+}: Props) {
   const { labels, annotations, filteredAnnotations, filters, setFilters, clearFilters, editAnnotation, removeAnnotation, addComment, removeComment } = useAnnotations()
+  const { quizzesForProject, fetchQuizzes } = useProjects()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editContent, setEditContent] = useState("")
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({})
   const [showFilters, setShowFilters] = useState(false)
+
+  // Quiz Modal states
+  const [activeQuiz, setActiveQuiz] = useState<Quiz | null>(null)
+  const [createQuizModalAnnId, setCreateQuizModalAnnId] = useState<string | null>(null)
+  const [takeQuizModal, setTakeQuizModal] = useState<Quiz | null>(null)
+  const [manageQuizModal, setManageQuizModal] = useState<Quiz | null>(null)
+  const [submissionsQuizModal, setSubmissionsQuizModal] = useState<Quiz | null>(null)
+  const [analyticsQuizModal, setAnalyticsQuizModal] = useState<Quiz | null>(null)
+  const [annotationQuizzes, setAnnotationQuizzes] = useState<Record<string, Quiz>>({})
 
   // Get unique users from annotations for the person filter
   const uniqueUsers = useMemo(() => {
@@ -32,18 +62,41 @@ export function AnnotationSidebar({ selectedAnnotations, onClose, documentText, 
     return Array.from(users.values())
   }, [annotations])
 
-  // `selectedAnnotations` may be derived from a parent snapshot. Resolve to the latest
-  // annotation objects in context so replies update instantly.
   const resolvedSelected = selectedAnnotations
     .map((a) => filteredAnnotations.find((x) => x.id === a.id))
     .filter((a): a is TextAnnotation => !!a)
 
-  // If the selected annotations were deleted, auto-close the sidebar.
   useEffect(() => {
     if (selectedAnnotations.length > 0 && resolvedSelected.length === 0) {
       onClose()
     }
   }, [onClose, resolvedSelected.length, selectedAnnotations.length])
+
+  // Load associated quizzes for selected annotations
+  useEffect(() => {
+    if (!projectId || resolvedSelected.length === 0) return
+    const fetchAnnQuizzes = async () => {
+      const pQuizzes = quizzesForProject(projectId)
+      const map: Record<string, Quiz> = {}
+      for (const ann of resolvedSelected) {
+        const match = pQuizzes.find((q) => q.annotationId === ann.id)
+        if (match) {
+          map[ann.id] = match
+        } else {
+          try {
+            const fetched = await getQuizzes(projectId, { annotationId: ann.id })
+            if (fetched && fetched.length > 0) {
+              map[ann.id] = fetched[0]
+            }
+          } catch (e) {
+            // Ignore error
+          }
+        }
+      }
+      setAnnotationQuizzes(map)
+    }
+    fetchAnnQuizzes()
+  }, [projectId, resolvedSelected, quizzesForProject])
 
   const startEditing = (ann: TextAnnotation) => {
     setEditingId(ann.id)
@@ -117,7 +170,6 @@ export function AnnotationSidebar({ selectedAnnotations, onClose, documentText, 
         
         {showFilters && (
           <div className="space-y-3">
-            {/* Filter by Person */}
             <div>
               <label className="text-xs text-gray-600 mb-1 block">Filter by person</label>
               <select
@@ -132,7 +184,6 @@ export function AnnotationSidebar({ selectedAnnotations, onClose, documentText, 
               </select>
             </div>
 
-            {/* Filter by Label */}
             <div>
               <label className="text-xs text-gray-600 mb-1 block">Filter by label</label>
               <select
@@ -147,7 +198,6 @@ export function AnnotationSidebar({ selectedAnnotations, onClose, documentText, 
               </select>
             </div>
 
-            {/* Clear Filters */}
             {(filters.userId || filters.labelId) && (
               <button
                 onClick={clearFilters}
@@ -165,6 +215,8 @@ export function AnnotationSidebar({ selectedAnnotations, onClose, documentText, 
         {resolvedSelected.map((ann) => {
           const label = labels.find((l) => l.id === ann.labelId)
           const isEditing = editingId === ann.id
+          const isQuizLabel = label?.name?.toLowerCase() === 'quiz'
+          const linkedQuiz = annotationQuizzes[ann.id]
 
           return (
             <div 
@@ -173,7 +225,7 @@ export function AnnotationSidebar({ selectedAnnotations, onClose, documentText, 
               onMouseEnter={() => onAnnotationHover?.(ann.id)}
               onMouseLeave={() => onAnnotationHover?.(null)}
             >
-              {/* Main annotation (like a post) */}
+              {/* Main annotation header */}
               <div className="p-3 bg-gray-50/60">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -196,7 +248,6 @@ export function AnnotationSidebar({ selectedAnnotations, onClose, documentText, 
                       <button
                         onClick={() => startEditing(ann)}
                         className="p-1 text-gray-700 hover:text-black rounded"
-                        aria-label="Edit annotation"
                         title="Edit annotation"
                       >
                         <Edit2 size={14} />
@@ -205,7 +256,6 @@ export function AnnotationSidebar({ selectedAnnotations, onClose, documentText, 
                     <button
                       onClick={() => handleDelete(ann.id)}
                       className="p-1 text-gray-700 hover:text-red-600 rounded"
-                      aria-label="Delete annotation"
                       title="Delete annotation"
                     >
                       <Trash2 size={14} />
@@ -219,21 +269,15 @@ export function AnnotationSidebar({ selectedAnnotations, onClose, documentText, 
                       <textarea
                         value={editContent}
                         onChange={(e) => setEditContent(e.target.value)}
-                        className="w-full text-sm text-gray-900 placeholder-gray-400 border border-gray-300 rounded-lg p-2 focus:outline-none focus:border-black min-h-[96px] bg-white"
-                        placeholder="Write the main annotation..."
+                        className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg p-2 focus:outline-none focus:border-black min-h-[80px] bg-white"
+                        placeholder="Write note or description..."
                         autoFocus
                       />
                       <div className="flex justify-end gap-2 mt-2">
-                        <button
-                          onClick={cancelEditing}
-                          className="px-2 py-1 text-xs text-gray-900 hover:bg-gray-100 rounded"
-                        >
+                        <button onClick={cancelEditing} className="px-2 py-1 text-xs text-gray-900 hover:bg-gray-100 rounded">
                           Cancel
                         </button>
-                        <button
-                          onClick={() => saveEditing(ann.id)}
-                          className="px-2 py-1 text-xs bg-black text-white hover:bg-gray-800 rounded flex items-center gap-1"
-                        >
+                        <button onClick={() => saveEditing(ann.id)} className="px-2 py-1 text-xs bg-black text-white hover:bg-gray-800 rounded flex items-center gap-1">
                           <Check size={12} /> Save
                         </button>
                       </div>
@@ -241,7 +285,7 @@ export function AnnotationSidebar({ selectedAnnotations, onClose, documentText, 
                   ) : (
                     <button
                       type="button"
-                      className={`w-full text-left rounded-lg border border-transparent hover:border-gray-200 hover:bg-white/80 transition-colors p-2 -m-2 ${
+                      className={`w-full text-left rounded-lg border border-transparent hover:border-gray-200 transition-colors p-2 -m-2 ${
                         !ann.content ? "cursor-pointer" : "cursor-default"
                       }`}
                       onClick={() => {
@@ -249,20 +293,79 @@ export function AnnotationSidebar({ selectedAnnotations, onClose, documentText, 
                       }}
                     >
                       <div className="text-sm text-gray-900 whitespace-pre-wrap leading-relaxed">
-                        {ann.content ? (
-                          ann.content
-                        ) : (
-                          <span className="text-gray-500 italic">
-                            No main annotation yet. Click to add one.
-                          </span>
-                        )}
+                        {ann.content ? ann.content : <span className="text-gray-500 italic">No notes added.</span>}
                       </div>
                     </button>
                   )}
                 </div>
               </div>
 
-              {/* Replies (like comments) */}
+              {/* INLINE QUIZ INTEGRATION CARD */}
+              {(isQuizLabel || linkedQuiz) && (
+                <div className="p-3 bg-purple-50/50 border-t border-b border-purple-100">
+                  <div className="flex items-center gap-2 text-xs font-bold text-purple-900 mb-2">
+                    <HelpCircle size={15} className="text-purple-600" />
+                    PDF Quiz Module
+                  </div>
+
+                  {linkedQuiz ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-gray-900">{linkedQuiz.title}</span>
+                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                          linkedQuiz.status === 'PUBLISHED' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700'
+                        }`}>
+                          {linkedQuiz.status}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap pt-1">
+                        {isOwner ? (
+                          <>
+                            <button
+                              onClick={() => setManageQuizModal(linkedQuiz)}
+                              className="text-xs bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 px-2.5 py-1 rounded font-semibold transition-colors"
+                            >
+                              Manage
+                            </button>
+                            <button
+                              onClick={() => setSubmissionsQuizModal(linkedQuiz)}
+                              className="text-xs bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 px-2.5 py-1 rounded font-medium transition-colors"
+                            >
+                              Submissions
+                            </button>
+                            <button
+                              onClick={() => setAnalyticsQuizModal(linkedQuiz)}
+                              className="text-xs bg-purple-600 text-white hover:bg-purple-700 px-2.5 py-1 rounded font-semibold flex items-center gap-1 transition-colors shadow-sm"
+                            >
+                              <BarChart2 size={12} />
+                              Analytics
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => setTakeQuizModal(linkedQuiz)}
+                            className="w-full text-xs bg-purple-600 text-white hover:bg-purple-700 px-3 py-1.5 rounded-md font-semibold transition-colors shadow-sm text-center"
+                          >
+                            Take Quiz
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ) : isOwner && projectId ? (
+                    <button
+                      onClick={() => setCreateQuizModalAnnId(ann.id)}
+                      className="w-full py-2 bg-purple-600 text-white hover:bg-purple-700 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                    >
+                      <Plus size={14} /> Create PDF Quiz Questions
+                    </button>
+                  ) : (
+                    <p className="text-xs text-gray-500 italic">No quiz questions published yet.</p>
+                  )}
+                </div>
+              )}
+
+              {/* Replies (Comments) */}
               <div className="p-3 border-t border-gray-100">
                 <div className="flex items-center gap-2 text-xs font-semibold text-gray-800">
                   <MessageSquareText size={14} />
@@ -273,7 +376,7 @@ export function AnnotationSidebar({ selectedAnnotations, onClose, documentText, 
                 </div>
 
                 {ann.comments && ann.comments.length > 0 ? (
-                  <div className="mt-3 flex flex-col gap-2 max-h-52 overflow-y-auto pr-1">
+                  <div className="mt-3 flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
                     {ann.comments.map((comment) => {
                       const username = comment.user?.username || "User"
                       const initial = (username?.[0] || "U").toUpperCase()
@@ -286,9 +389,7 @@ export function AnnotationSidebar({ selectedAnnotations, onClose, documentText, 
                             <div className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0">
-                                  <div className="text-[11px] font-semibold text-gray-800 truncate">
-                                    {username}
-                                  </div>
+                                  <div className="text-[11px] font-semibold text-gray-800 truncate">{username}</div>
                                   <div className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">
                                     {comment.content}
                                   </div>
@@ -296,7 +397,6 @@ export function AnnotationSidebar({ selectedAnnotations, onClose, documentText, 
                                 <button
                                   onClick={() => handleDeleteComment(ann.id, comment.id)}
                                   className="p-1 text-gray-500 hover:text-red-600 rounded flex-shrink-0"
-                                  aria-label="Delete reply"
                                   title="Delete reply"
                                 >
                                   <Trash2 size={12} />
@@ -309,9 +409,7 @@ export function AnnotationSidebar({ selectedAnnotations, onClose, documentText, 
                     })}
                   </div>
                 ) : (
-                  <div className="mt-2 text-xs text-gray-500">
-                    No replies yet. Be the first to comment.
-                  </div>
+                  <div className="mt-2 text-xs text-gray-500">No replies yet.</div>
                 )}
 
                 <div className="mt-3">
@@ -334,15 +432,61 @@ export function AnnotationSidebar({ selectedAnnotations, onClose, documentText, 
                       Send
                     </button>
                   </div>
-                  <div className="mt-1 text-[11px] text-gray-400">
-                    Press Enter to send
-                  </div>
                 </div>
               </div>
             </div>
           )
         })}
       </div>
+
+      {/* Quiz Modals */}
+      {createQuizModalAnnId && projectId && (
+        <CreateQuizModal
+          projectId={projectId}
+          documentId={docId || null}
+          annotationId={createQuizModalAnnId}
+          onClose={() => {
+            setCreateQuizModalAnnId(null)
+            if (projectId) fetchQuizzes(projectId)
+          }}
+        />
+      )}
+
+      {takeQuizModal && projectId && (
+        <QuizTakeModal
+          quiz={takeQuizModal}
+          projectId={projectId}
+          onClose={() => setTakeQuizModal(null)}
+        />
+      )}
+
+      {manageQuizModal && projectId && (
+        <ManageQuizModal
+          quizId={manageQuizModal.id}
+          projectId={projectId}
+          onClose={() => {
+            setManageQuizModal(null)
+            if (projectId) fetchQuizzes(projectId)
+          }}
+        />
+      )}
+
+      {submissionsQuizModal && projectId && (
+        <QuizSubmissionsModal
+          quiz={submissionsQuizModal}
+          projectId={projectId}
+          onClose={() => setSubmissionsQuizModal(null)}
+        />
+      )}
+
+      {analyticsQuizModal && projectId && (
+        <QuizAnalyticsModal
+          projectId={projectId}
+          quizId={analyticsQuizModal.id}
+          quizTitle={analyticsQuizModal.title}
+          onClose={() => setAnalyticsQuizModal(null)}
+        />
+      )}
     </div>
   )
 }

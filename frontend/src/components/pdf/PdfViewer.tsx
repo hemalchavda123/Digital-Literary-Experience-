@@ -81,7 +81,7 @@ export function PdfViewer({ doc, onAnnotationClick, onTextContentChange, filtere
   const [error, setError] = useState<string | null>(null)
   const [isRendered, setIsRendered] = useState(false)
   const [naturalPdfWidth, setNaturalPdfWidth] = useState(0)
-  const { annotations: contextAnnotations, labels, addAnnotation } = useAnnotations()
+  const { annotations: contextAnnotations, labels, addAnnotation, addLabel } = useAnnotations()
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; start: number; end: number } | null>(null)
   const [highlights, setHighlights] = useState<HighlightBox[]>([])
   const [zoom, setZoom] = useState(1.3)
@@ -495,27 +495,38 @@ export function PdfViewer({ doc, onAnnotationClick, onTextContentChange, filtere
 
       {contextMenu && (
         <div
-          className="fixed z-50 min-w-[160px] rounded-md border border-gray-200 bg-white shadow-lg py-1 text-sm"
+          className="fixed z-50 min-w-[180px] rounded-md border border-gray-200 bg-white shadow-lg py-1 text-sm"
           style={{ top: contextMenu.y, left: contextMenu.x }}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="px-3 py-1.5 font-medium text-xs text-gray-500 uppercase tracking-wider">
             Add Annotation
           </div>
-          {labels.length === 0 ? (
-            <div className="px-3 py-2 text-gray-500 italic text-xs">No labels created yet.</div>
-          ) : (
-            labels.map((label) => (
-              <button
-                key={label.id}
-                onClick={() => handleAddAnnotation(label.id)}
-                className="w-full text-left px-3 py-1.5 hover:bg-gray-100 flex items-center gap-2"
-              >
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: label.color }} />
-                <span className="truncate text-gray-900">{label.name}</span>
-              </button>
-            ))
-          )}
+          {labels.map((label) => (
+            <button
+              key={label.id}
+              onClick={() => handleAddAnnotation(label.id)}
+              className="w-full text-left px-3 py-1.5 hover:bg-gray-100 flex items-center gap-2"
+            >
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: label.color }} />
+              <span className="truncate text-gray-900">{label.name}</span>
+            </button>
+          ))}
+          <button
+            onClick={async () => {
+              let quizLabel = labels.find((l) => l.name.toLowerCase() === 'quiz')
+              if (!quizLabel) {
+                quizLabel = await addLabel(doc.projectId, "Quiz", "#8b5cf6")
+              }
+              if (quizLabel) {
+                await handleAddAnnotation(quizLabel.id)
+              }
+            }}
+            className="w-full text-left px-3 py-1.5 hover:bg-purple-50 flex items-center gap-2 border-t border-gray-100 font-semibold text-purple-700"
+          >
+            <div className="w-3 h-3 rounded-full bg-purple-600" />
+            <span>+ Quiz Annotation</span>
+          </button>
         </div>
       )}
     </div>

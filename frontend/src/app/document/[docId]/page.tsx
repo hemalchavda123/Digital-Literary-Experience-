@@ -12,7 +12,8 @@ import { TextAnnotation } from "@/types/annotation"
 import type { Document } from "@/types/document"
 import dynamic from "next/dynamic"
 import { getCurrentUser } from "@/lib/api/authFetch"
-import { Filter, X as CloseIcon } from "lucide-react"
+import { Filter, X as CloseIcon, BarChart2 } from "lucide-react"
+import { PdfQuizAnalyticsModal } from "@/components/project/PdfQuizAnalyticsModal"
 
 const PdfViewer = dynamic(() => import("@/components/pdf/PdfViewer").then(mod => mod.PdfViewer), { ssr: false })
 
@@ -32,6 +33,7 @@ export default function DocumentPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState<{ userId: string | null; labelId: string | null }>({ userId: null, labelId: null })
   const [hoveredAnnotationId, setHoveredAnnotationId] = useState<string | null>(null)
+  const [showPdfAnalyticsModal, setShowPdfAnalyticsModal] = useState(false)
   const pdfContainerRef = useRef<HTMLDivElement>(null)
 
   // Function to extract text using the same TreeWalker approach as getRangeForOffsets
@@ -263,13 +265,23 @@ export default function DocumentPage() {
               Manage Labels
             </button>
             {isOwner && (
-              <button
-                type="button"
-                onClick={() => setIsPermissionsModalOpen(true)}
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                Permissions
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowPdfAnalyticsModal(true)}
+                  className="px-3 py-1.5 text-sm font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors flex items-center gap-1.5"
+                >
+                  <BarChart2 size={15} />
+                  PDF Quiz Analytics
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPermissionsModalOpen(true)}
+                  className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  Permissions
+                </button>
+              </>
             )}
             <button
               type="button"
@@ -329,6 +341,9 @@ export default function DocumentPage() {
           selectedAnnotations={selectedAnnotations}
           onClose={() => setSelectedAnnotations([])}
           onAnnotationHover={setHoveredAnnotationId}
+          isOwner={isOwner}
+          projectId={doc.projectId}
+          docId={doc.id}
         />
       </main>
 
@@ -344,6 +359,14 @@ export default function DocumentPage() {
           onClose={() => setIsPermissionsModalOpen(false)}
           projectId={project.id}
           isOwner={isOwner}
+        />
+      )}
+      {showPdfAnalyticsModal && (
+        <PdfQuizAnalyticsModal
+          projectId={doc.projectId}
+          documentId={doc.id}
+          documentTitle={doc.title}
+          onClose={() => setShowPdfAnalyticsModal(false)}
         />
       )}
     </div>

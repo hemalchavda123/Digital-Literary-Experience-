@@ -7,6 +7,8 @@ import { CreateQuizModal } from "./CreateQuizModal"
 import { QuizTakeModal } from "./QuizTakeModal"
 import { QuizSubmissionsModal } from "./QuizSubmissionsModal"
 import { ManageQuizModal } from "./ManageQuizModal"
+import { QuizAnalyticsModal } from "./QuizAnalyticsModal"
+import { BarChart2 } from "lucide-react"
 
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-500",
@@ -38,6 +40,7 @@ function QuizItem({
   const [takeModalOpen, setTakeModalOpen] = useState(false)
   const [submissionsModalOpen, setSubmissionsModalOpen] = useState(false)
   const [manageModalOpen, setManageModalOpen] = useState(false)
+  const [analyticsModalOpen, setAnalyticsModalOpen] = useState(false)
 
   const handlePublish = async () => {
     if (window.confirm(`Publish quiz "${quiz.title}"? Project members will be able to take it.`)) {
@@ -91,7 +94,7 @@ function QuizItem({
       )}
 
       {/* Actions */}
-      <div className="mt-1 flex items-center gap-4">
+      <div className="mt-1 flex items-center gap-4 flex-wrap">
         {isOwner ? (
           <>
             {quiz.status === 'DRAFT' && (
@@ -113,6 +116,13 @@ function QuizItem({
               className="text-xs font-medium text-gray-500 hover:text-gray-800 transition-colors"
             >
               View Submissions
+            </button>
+            <button
+              onClick={() => setAnalyticsModalOpen(true)}
+              className="text-xs font-semibold text-purple-700 hover:text-purple-900 transition-colors flex items-center gap-1 bg-purple-50 px-2.5 py-1 rounded"
+            >
+              <BarChart2 size={13} />
+              Analytics
             </button>
           </>
         ) : (
@@ -146,6 +156,15 @@ function QuizItem({
           quizId={quiz.id}
           projectId={projectId}
           onClose={() => setManageModalOpen(false)}
+        />
+      )}
+
+      {analyticsModalOpen && (
+        <QuizAnalyticsModal
+          projectId={projectId}
+          quizId={quiz.id}
+          quizTitle={quiz.title}
+          onClose={() => setAnalyticsModalOpen(false)}
         />
       )}
     </div>

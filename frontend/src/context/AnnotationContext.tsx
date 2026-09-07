@@ -23,7 +23,7 @@ type AnnotationContextValue = {
   clearFilters: () => void
   fetchLabels: (projectId: string) => Promise<void>
   fetchAnnotations: (docId: string) => Promise<void>
-  addLabel: (projectId: string, name: string, color: string) => Promise<void>
+  addLabel: (projectId: string, name: string, color: string) => Promise<AnnotationLabel>
   editLabel: (id: string, name: string, color: string) => Promise<void>
   removeLabel: (id: string) => Promise<void>
   addAnnotation: (docId: string, labelId: string, startOffset: number, endOffset: number, content?: string) => Promise<void>
@@ -160,6 +160,7 @@ export function AnnotationProvider({ children }: { children: ReactNode }) {
     try {
       const newLabel = await api.createLabel(projectId, name, color)
       setLabels((prev) => [...prev, newLabel])
+      return newLabel
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create label")
       throw err

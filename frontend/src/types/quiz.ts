@@ -17,6 +17,8 @@ export interface QuizQuestion {
 export interface Quiz {
   id: string;
   projectId: string;
+  documentId?: string | null;
+  annotationId?: string | null;
   title: string;
   description: string;
   status: QuizStatus;
@@ -50,4 +52,80 @@ export interface QuizSubmission {
     username: string;
     email: string;
   };
+}
+
+export interface ScoreBin {
+  rangeLabel: string;
+  count: number;
+  percentage: number;
+}
+
+export interface OptionDistribution {
+  option: string;
+  count: number;
+  percentage: number;
+}
+
+export interface ResponseDistributionItem {
+  answerText: string;
+  count: number;
+  percentage: number;
+  isCorrect?: boolean | null;
+}
+
+export interface QuestionBreakdown {
+  id: string;
+  questionText: string;
+  type: QuestionType;
+  marks: number;
+  correctAnswer: string | null;
+  totalAnswers: number;
+  correctCount: number;
+  incorrectCount: number;
+  correctPercentage: number;
+  optionDistribution?: OptionDistribution[];
+  responseDistribution?: ResponseDistributionItem[];
+}
+
+export interface QuizAnalytics {
+  quizId: string;
+  title: string;
+  description: string;
+  status: QuizStatus;
+  annotationId?: string | null;
+  documentId?: string | null;
+  totalSubmissions: number;
+  totalQuestions: number;
+  maxPossibleScore: number;
+  averageScore: number;
+  averagePercentage: number;
+  highestScore: number;
+  lowestScore: number;
+  passRate: number;
+  recommendedChart?: 'pie' | 'bar';
+  scoreDistribution?: ScoreBin[];
+  questionBreakdown: QuestionBreakdown[];
+}
+
+export interface PdfQuizSummary {
+  quizId: string;
+  title: string;
+  status: QuizStatus;
+  annotationId?: string | null;
+  annotationSnippet?: string | null;
+  questionCount: number;
+  maxMarks: number;
+  submissionsCount: number;
+  averageScore: number;
+  averagePercentage: number;
+}
+
+export interface PdfQuizAnalytics {
+  documentId: string;
+  documentTitle: string;
+  totalPdfQuizzes: number;
+  totalSubmissionsCount: number;
+  overallAveragePercentage: number;
+  recommendedChart?: 'pie' | 'bar';
+  quizSummaries: PdfQuizSummary[];
 }
