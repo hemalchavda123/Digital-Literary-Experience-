@@ -143,36 +143,101 @@ export const updateQuiz = async (req: Request, res: Response, next: NextFunction
       return res.status(403).json({ message: 'Only project owner can update quizzes' });
     }
 
-    if (questions) {
-      await prisma.quizQuestion.deleteMany({ where: { quizId } });
+    // Handle questions update if provided
+    if (Array.isArray(questions)) {
+      const existingQuestions = await prisma.quizQuestion.findMany({ where: { quizId } });
+      const existingMap = new Map(existingQuestions.map((q) => [q.id, q]));
+      const incomingIds = new Set(questions.map((q: any) => q.id).filter(Boolean));
+
+      // 1. Delete questions that were REMOVED by owner (not in incomingIds)
+      const removedQuestions = existingQuestions.filter((q) => !incomingIds.has(q.id));
+      if (removedQuestions.length > 0) {
+        await prisma.quizQuestion.deleteMany({
+          where: { id: { in: removedQuestions.map((q) => q.id) } },
+        });
+      }
+
+      // 2. Process each question: update if existing, or create if new/modified
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        const formattedOptions = q.options ? (typeof q.options === 'string' ? q.options : JSON.stringify(q.options)) : null;
+
+        if (q.id && existingMap.has(q.id)) {
+          const existing = existingMap.get(q.id)!;
+          // Check if question details were MODIFIED
+          const textChanged = existing.questionText !== q.questionText;
+          const typeChanged = existing.type !== q.type;
+          const optionsChanged = existing.options !== formattedOptions;
+          const answerChanged = (existing.correctAnswer || '') !== (q.correctAnswer || '');
+
+          if (textChanged || typeChanged || optionsChanged || answerChanged) {
+            // Question was modified -> delete past responses for this specific question
+            await prisma.quizAnswer.deleteMany({ where: { questionId: q.id } });
+          }
+
+          // Update question properties
+          await prisma.quizQuestion.update({
+            where: { id: q.id },
+            data: {
+              type: q.type,
+              questionText: q.questionText,
+              options: formattedOptions,
+              order: i,
+              marks: q.marks || 1,
+              correctAnswer: q.correctAnswer || null,
+              isPublished: q.isPublished !== undefined ? q.isPublished : true,
+            },
+          });
+        } else {
+          // New question -> create
+          await prisma.quizQuestion.create({
+            data: {
+              quizId,
+              type: q.type,
+              questionText: q.questionText,
+              options: formattedOptions,
+              order: i,
+              marks: q.marks || 1,
+              correctAnswer: q.correctAnswer || null,
+              isPublished: q.isPublished !== undefined ? q.isPublished : true,
+            },
+          });
+        }
+      }
     }
 
+    // Update Quiz basic details
     const updatedQuiz = await prisma.quiz.update({
       where: { id: quizId },
       data: {
-        title,
-        description,
-        status,
+        ...(title !== undefined ? { title } : {}),
+        ...(description !== undefined ? { description } : {}),
+        ...(status !== undefined ? { status } : {}),
         ...(documentId !== undefined ? { documentId } : {}),
         ...(annotationId !== undefined ? { annotationId } : {}),
-        ...(questions
-          ? {
-              questions: {
-                create: questions.map((q: any, i: number) => ({
-                  type: q.type,
-                  questionText: q.questionText,
-                  options: q.options ? (typeof q.options === 'string' ? q.options : JSON.stringify(q.options)) : null,
-                  order: i,
-                  marks: q.marks || 1,
-                  correctAnswer: q.correctAnswer || null,
-                  isPublished: q.isPublished !== undefined ? q.isPublished : true,
-                })),
-              },
-            }
-          : {}),
       },
-      include: { questions: true },
+      include: {
+        questions: { orderBy: { order: 'asc' } },
+      },
     });
+
+    // Sync all existing QuizSubmission totalScores for this quiz against current active questions
+    const activeQuestionIds = new Set(updatedQuiz.questions.map((q) => q.id));
+    const submissions = await prisma.quizSubmission.findMany({
+      where: { quizId },
+      include: { answers: true },
+    });
+
+    for (const sub of submissions) {
+      const validAnswers = sub.answers.filter((a) => activeQuestionIds.has(a.questionId));
+      const newScore = validAnswers.reduce((sum, a) => sum + (a.score || 0), 0);
+      if (sub.totalScore !== newScore) {
+        await prisma.quizSubmission.update({
+          where: { id: sub.id },
+          data: { totalScore: newScore },
+        });
+      }
+    }
 
     res.json(updatedQuiz);
   } catch (error) {
@@ -222,17 +287,26 @@ export const submitQuiz = async (req: Request, res: Response, next: NextFunction
       return res.status(404).json({ message: 'Quiz not found or not published' });
     }
 
-    // CHECK FOR EXISTING SUBMISSION TO PREVENT P2002 CRASH
+    // CHECK FOR EXISTING SUBMISSION (Allow retake if quiz was updated after submission)
     const existingSubmission = await prisma.quizSubmission.findUnique({
       where: { quizId_userId: { quizId, userId } },
       include: { answers: true },
     });
 
     if (existingSubmission) {
-      return res.status(400).json({
-        message: 'You have already submitted this quiz',
-        alreadySubmitted: true,
-        submission: existingSubmission,
+      const isOutdated = quiz.updatedAt && new Date(quiz.updatedAt).getTime() > new Date(existingSubmission.submittedAt).getTime();
+
+      if (!isOutdated) {
+        return res.status(400).json({
+          message: 'You have already submitted the latest version of this quiz',
+          alreadySubmitted: true,
+          submission: existingSubmission,
+        });
+      }
+
+      // Quiz was updated by owner after previous attempt -> delete old submission so student can submit new attempt
+      await prisma.quizSubmission.delete({
+        where: { id: existingSubmission.id },
       });
     }
 
@@ -286,6 +360,12 @@ export const getMySubmission = async (req: Request, res: Response, next: NextFun
       return res.status(403).json({ message: 'Access denied to this project' });
     }
 
+    const quiz = await prisma.quiz.findUnique({
+      where: { id: quizId },
+      include: { questions: true },
+    });
+    const validQuestionIds = new Set((quiz?.questions || []).map((q) => q.id));
+
     const submission = await prisma.quizSubmission.findUnique({
       where: { quizId_userId: { quizId, userId } },
       include: {
@@ -293,7 +373,21 @@ export const getMySubmission = async (req: Request, res: Response, next: NextFun
       },
     });
 
-    res.json({ submitted: !!submission, submission });
+    let isOutdated = false;
+    if (submission && quiz && quiz.updatedAt) {
+      isOutdated = new Date(quiz.updatedAt).getTime() > new Date(submission.submittedAt).getTime();
+    }
+
+    if (submission) {
+      submission.answers = submission.answers.filter((a) => validQuestionIds.has(a.questionId));
+      submission.totalScore = submission.answers.reduce((sum, a) => sum + (a.score || 0), 0);
+    }
+
+    res.json({
+      submitted: !!submission && !isOutdated,
+      isOutdated,
+      submission,
+    });
   } catch (error) {
     next(error);
   }
@@ -310,13 +404,29 @@ export const getSubmissions = async (req: Request, res: Response, next: NextFunc
       return res.status(403).json({ message: 'Only project owner can view all submissions' });
     }
 
-    const submissions = await prisma.quizSubmission.findMany({
+    const quiz = await prisma.quiz.findUnique({
+      where: { id: quizId },
+      include: { questions: true },
+    });
+    const validQuestionIds = new Set((quiz?.questions || []).map((q) => q.id));
+
+    const rawSubmissions = await prisma.quizSubmission.findMany({
       where: { quizId },
       include: {
         user: { select: { id: true, username: true, email: true } },
         answers: true,
       },
       orderBy: { submittedAt: 'desc' },
+    });
+
+    const submissions = rawSubmissions.map((sub) => {
+      const validAnswers = sub.answers.filter((a) => validQuestionIds.has(a.questionId));
+      const totalScore = validAnswers.reduce((sum, a) => sum + (a.score || 0), 0);
+      return {
+        ...sub,
+        answers: validAnswers,
+        totalScore,
+      };
     });
 
     res.json(submissions);
@@ -354,17 +464,23 @@ export const getQuizAnalytics = async (req: Request, res: Response, next: NextFu
       return res.status(404).json({ message: 'Quiz not found' });
     }
 
+    const validQuestionIds = new Set(quiz.questions.map((q) => q.id));
     const totalSubmissions = quiz.submissions.length;
     const maxPossibleScore = quiz.questions.reduce((sum, q) => sum + q.marks, 0);
 
-    let scores = quiz.submissions.map((s) => s.totalScore ?? 0);
-    const averageScore = totalSubmissions > 0 ? (scores.reduce((a, b) => a + b, 0) / totalSubmissions) : 0;
+    // Calculate recalculated total score for each submission based ONLY on active questions
+    const scores = quiz.submissions.map((sub) => {
+      const validAnswers = sub.answers.filter((a) => validQuestionIds.has(a.questionId));
+      return validAnswers.reduce((sum, a) => sum + (a.score || 0), 0);
+    });
+
+    const averageScore = totalSubmissions > 0 ? scores.reduce((a, b) => a + b, 0) / totalSubmissions : 0;
     const highestScore = totalSubmissions > 0 ? Math.max(...scores) : 0;
     const lowestScore = totalSubmissions > 0 ? Math.min(...scores) : 0;
     const passingCount = scores.filter((s) => maxPossibleScore > 0 && s / maxPossibleScore >= 0.5).length;
     const passRate = totalSubmissions > 0 ? Math.round((passingCount / totalSubmissions) * 100) : 0;
 
-    // Score Distribution Bins (0-20%, 21-40%, 41-60%, 61-80%, 81-100%)
+    // Score Distribution Bins
     const bins = [
       { label: '0-20%', range: [0, 0.2], count: 0 },
       { label: '21-40%', range: [0.201, 0.4], count: 0 },
@@ -373,8 +489,8 @@ export const getQuizAnalytics = async (req: Request, res: Response, next: NextFu
       { label: '81-100%', range: [0.801, 1.0], count: 0 },
     ];
 
-    quiz.submissions.forEach((sub) => {
-      const pct = maxPossibleScore > 0 ? (sub.totalScore ?? 0) / maxPossibleScore : 0;
+    scores.forEach((score) => {
+      const pct = maxPossibleScore > 0 ? score / maxPossibleScore : 0;
       for (const bin of bins) {
         if (pct >= bin.range[0] && pct <= bin.range[1]) {
           bin.count++;
@@ -389,7 +505,7 @@ export const getQuizAnalytics = async (req: Request, res: Response, next: NextFu
       percentage: totalSubmissions > 0 ? Math.round((bin.count / totalSubmissions) * 100) : 0,
     }));
 
-    // Question Breakdown (Google Forms style question-by-question analytics)
+    // Question Breakdown (Google Forms style question-by-question analytics for active questions only)
     const questionBreakdown = quiz.questions.map((q) => {
       const allAnswers = quiz.submissions.flatMap((s) => s.answers.filter((a) => a.questionId === q.id));
       const totalAnsCount = allAnswers.length;
@@ -438,16 +554,14 @@ export const getQuizAnalytics = async (req: Request, res: Response, next: NextFu
         incorrectCount: incorrectAnsCount,
         correctPercentage,
         responseDistribution,
-        optionDistribution: responseDistribution.map(r => ({
+        optionDistribution: responseDistribution.map((r) => ({
           option: r.answerText,
           count: r.count,
-          percentage: r.percentage
-        }))
+          percentage: r.percentage,
+        })),
       };
     });
 
-    // Auto-recommendation logic for chart type
-    // If few submissions or few populated bins, Pie is cleaner; if spread out, Histogram/Bar is better.
     const populatedBinsCount = scoreDistribution.filter((b) => b.count > 0).length;
     const recommendedChart: 'pie' | 'bar' = totalSubmissions <= 5 || populatedBinsCount <= 3 ? 'pie' : 'bar';
 
@@ -505,16 +619,14 @@ export const getPdfQuizAnalytics = async (req: Request, res: Response, next: Nex
     const pdfQuizzes = await prisma.quiz.findMany({
       where: {
         projectId,
-        OR: [
-          { documentId: docId },
-          { annotationId: { in: annIds } },
-        ],
+        OR: [{ documentId: docId }, { annotationId: { in: annIds } }],
       },
       include: {
         questions: true,
         submissions: {
           include: {
             user: { select: { id: true, username: true } },
+            answers: true,
           },
         },
         annotation: {
@@ -529,10 +641,16 @@ export const getPdfQuizAnalytics = async (req: Request, res: Response, next: Nex
     let sumPercentageScores = 0;
 
     const quizSummaries = pdfQuizzes.map((quiz) => {
+      const validQuestionIds = new Set(quiz.questions.map((q) => q.id));
       const subCount = quiz.submissions.length;
       totalSubmissionsCount += subCount;
       const maxMarks = quiz.questions.reduce((sum, q) => sum + q.marks, 0);
-      const scores = quiz.submissions.map((s) => s.totalScore ?? 0);
+
+      const scores = quiz.submissions.map((sub) => {
+        const validAnswers = (sub.answers || []).filter((a) => validQuestionIds.has(a.questionId));
+        return validAnswers.reduce((sum, a) => sum + (a.score || 0), 0);
+      });
+
       const avgScore = subCount > 0 ? scores.reduce((a, b) => a + b, 0) / subCount : 0;
       const avgPct = maxMarks > 0 ? (avgScore / maxMarks) * 100 : 0;
 

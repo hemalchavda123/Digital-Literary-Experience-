@@ -30,8 +30,8 @@ export function CreateProjectModal({ isOpen, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="w-full max-w-md max-h-[85vh] rounded-xl bg-white p-6 shadow-2xl border border-gray-200 flex flex-col overflow-hidden">
         <h2 className="text-lg font-semibold mb-4 text-gray-900">New Project</h2>
         <label className="block text-sm mb-2 text-gray-900">Project name</label>
         <input

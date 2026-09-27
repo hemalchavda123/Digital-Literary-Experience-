@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, JSX } from "react"
 import { useRouter } from "next/navigation"
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 
@@ -154,6 +155,35 @@ export default function Signup2(): JSX.Element {
     }
   }
 
+  async function handleGoogleSuccess(credentialResponse: any) {
+    setIsSubmitting(true)
+    setMessage(null)
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/google`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: credentialResponse.credential }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        const errMsg = data?.error?.message || "Google Login failed"
+        setMessage({ text: errMsg, type: "error" })
+        setIsSubmitting(false)
+        return
+      }
+
+      setTokenCookie(data.accessToken, data.refreshToken)
+      router.push("/home")
+    } catch {
+      setMessage({ text: "Network error during Google login.", type: "error" })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   /* ---- styles ---- */
 
   const inputStyle: React.CSSProperties = {
@@ -245,17 +275,18 @@ export default function Signup2(): JSX.Element {
   )
 
   return (
-    <div
-      style={{
-        height: "100vh",
-        width: "100vw",
-        overflow: "hidden",
-        backgroundColor: "#ffffff",
-        position: "relative",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
+    <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID"}>
+      <div
+        style={{
+          height: "100vh",
+          width: "100vw",
+          overflow: "hidden",
+          backgroundColor: "#ffffff",
+          position: "relative",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
       {/* Main Layout */}
       <div
         style={{
@@ -384,8 +415,20 @@ export default function Signup2(): JSX.Element {
                       </button>
                     </form>
 
+                    <div style={{ marginTop: 16, marginBottom: 8, display: 'flex', justifyContent: 'center' }}>
+                      <GoogleLogin
+                        onSuccess={handleGoogleSuccess}
+                        onError={() => {
+                          setMessage({ text: "Google Login failed.", type: "error" })
+                        }}
+                        theme="outline"
+                        shape="pill"
+                        text="signup_with"
+                      />
+                    </div>
+
                     <button
-                      onClick={() => { setViewIndex(1); setMessage(null) }}
+                        onClick={() => { setViewIndex(1); setMessage(null) }}
                       style={linkStyle}
                     >
                       Already have an account? Login
@@ -455,6 +498,18 @@ export default function Signup2(): JSX.Element {
                       </button>
                     </form>
 
+                    <div style={{ marginTop: 16, marginBottom: 8, display: 'flex', justifyContent: 'center' }}>
+                      <GoogleLogin
+                        onSuccess={handleGoogleSuccess}
+                        onError={() => {
+                          setMessage({ text: "Google Login failed.", type: "error" })
+                        }}
+                        theme="outline"
+                        shape="pill"
+                        text="signin_with"
+                      />
+                    </div>
+
                     <button
                       onClick={() => { setViewIndex(0); setMessage(null) }}
                       style={linkStyle}
@@ -522,5 +577,6 @@ export default function Signup2(): JSX.Element {
         )}
       </div>
     </div>
+    </GoogleOAuthProvider>
   )
 }

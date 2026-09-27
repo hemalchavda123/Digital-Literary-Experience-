@@ -268,7 +268,7 @@ export default function DocumentPage() {
               <>
                 <button
                   type="button"
-                  onClick={() => setShowPdfAnalyticsModal(true)}
+                  onClick={() => router.push(`/project/${doc.projectId}/document/${doc.id}/analytics`)}
                   className="px-3 py-1.5 text-sm font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors flex items-center gap-1.5"
                 >
                   <BarChart2 size={15} />
@@ -359,14 +359,6 @@ export default function DocumentPage() {
           onClose={() => setIsPermissionsModalOpen(false)}
           projectId={project.id}
           isOwner={isOwner}
-        />
-      )}
-      {showPdfAnalyticsModal && (
-        <PdfQuizAnalyticsModal
-          projectId={doc.projectId}
-          documentId={doc.id}
-          documentTitle={doc.title}
-          onClose={() => setShowPdfAnalyticsModal(false)}
         />
       )}
     </div>

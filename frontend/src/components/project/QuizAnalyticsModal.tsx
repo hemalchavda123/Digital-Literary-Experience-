@@ -151,7 +151,7 @@ function QuestionHorizontalBarChart({ responses }: { responses: ResponseDistribu
 
 function QuestionCard({ q, index }: { q: QuestionBreakdown; index: number }) {
   const [view, setView] = useState<"pie" | "bar" | "list">("pie")
-  const responses = q.responseDistribution || q.optionDistribution?.map(o => ({ answerText: o.option, count: o.count, percentage: o.percentage })) || []
+  const responses: ResponseDistributionItem[] = q.responseDistribution || q.optionDistribution?.map(o => ({ answerText: o.option, count: o.count, percentage: o.percentage, isCorrect: false })) || []
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4 hover:shadow-md transition-shadow">
@@ -267,9 +267,9 @@ export function QuizAnalyticsModal({ projectId, quizId, quizTitle, onClose }: Pr
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-gray-50 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden border border-gray-200">
+      <div className="bg-gray-50 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden border border-gray-200">
         {/* Top Google Forms Style Header Card */}
-        <div className="bg-white border-b border-gray-200 p-6 relative">
+        <div className="bg-white border-b border-gray-200 p-6 relative flex-shrink-0">
           <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-indigo-600 via-purple-600 to-emerald-500 rounded-t-2xl" />
           
           <div className="flex items-start justify-between gap-4 pt-1">
@@ -357,7 +357,7 @@ export function QuizAnalyticsModal({ projectId, quizId, quizTitle, onClose }: Pr
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-200 flex justify-end bg-white">
+        <div className="p-4 border-t border-gray-200 flex justify-end bg-white flex-shrink-0">
           <button
             onClick={onClose}
             className="px-6 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md transition-colors"

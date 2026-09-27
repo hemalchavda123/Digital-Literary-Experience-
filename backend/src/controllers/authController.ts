@@ -1,8 +1,12 @@
 import { Request, Response } from 'express';
-import userService from '../services/userService';
+import userService, { SafeUser } from '../services/userService';
 import passwordService from '../services/passwordService';
 import { jwtService } from '../services/jwtService';
 import emailService from '../services/emailService';
+import { OAuth2Client } from 'google-auth-library';
+import crypto from 'crypto';
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 /**
  * AuthController handles authentication-related HTTP requests
@@ -205,6 +209,111 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     });
   }
 };
+
+/**
+ * Google Auth
+ * POST /api/auth/google
+ * Body: { token }
+ */
+export const googleAuth = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      res.status(400).json({
+        error: {
+          message: 'Google token is required',
+          code: 'VALIDATION_ERROR',
+        },
+      });
+      return;
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email) {
+      res.status(401).json({
+        error: {
+          message: 'Invalid Google token',
+          code: 'INVALID_TOKEN',
+        },
+      });
+      return;
+    }
+
+    const email = payload.email.trim().toLowerCase();
+
+    // Restrict to @dau.ac.in
+    if (!email.endsWith('@dau.ac.in')) {
+      res.status(403).json({
+        error: {
+          message: 'Only @dau.ac.in accounts are allowed to log in.',
+          code: 'FORBIDDEN_DOMAIN',
+        },
+      });
+      return;
+    }
+
+    let existingUser = await userService.findUserByEmail(email);
+    let safeUser: SafeUser;
+
+    if (!existingUser) {
+      // User doesn't exist, create a new one
+      const baseUsername = email.split('@')[0];
+      let finalUsername = baseUsername;
+      let counter = 1;
+      
+      // Ensure unique username
+      while (await userService.findUserByUsername(finalUsername)) {
+        finalUsername = `${baseUsername}${counter}`;
+        counter++;
+      }
+
+      // Generate random password
+      const randomPassword = crypto.randomBytes(16).toString('hex');
+      const hashedPassword = await passwordService.hashPassword(randomPassword);
+
+      safeUser = await userService.createUser({
+        email: email,
+        username: finalUsername,
+        password: hashedPassword,
+      });
+    } else {
+      const { password: _, ...userWithoutPassword } = existingUser;
+      safeUser = userWithoutPassword;
+    }
+
+    // Generate tokens
+    const jwt = jwtService();
+    const accessToken = jwt.generateAccessToken({
+      userId: safeUser.id,
+      email: safeUser.email,
+      username: safeUser.username,
+    });
+    const refreshToken = jwt.generateRefreshToken({
+      userId: safeUser.id,
+    });
+
+    res.json({
+      accessToken,
+      refreshToken,
+      user: safeUser,
+    });
+  } catch (error) {
+    console.error('Google auth error:', error);
+    res.status(500).json({
+      error: {
+        message: 'An unexpected error occurred during Google authentication',
+        code: 'INTERNAL_ERROR',
+      },
+    });
+  }
+};
+
 
 /**
  * Refresh access token

@@ -150,11 +150,11 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
   const previewQuestions = questions.filter(q => q.isPublished)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden border border-gray-200">
         
         {/* Header */}
-        <div className="flex justify-between items-center p-5 border-b border-gray-200">
+        <div className="flex justify-between items-center p-5 border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center gap-4">
             <h2 className="text-xl font-bold text-gray-900">Manage Quiz</h2>
             <div className="flex bg-gray-100 rounded-lg p-1">

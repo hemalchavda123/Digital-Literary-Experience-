@@ -1,9 +1,7 @@
-"use client"
-
 import { useState, useEffect } from "react"
 import type { Quiz, QuizQuestion } from "@/types/quiz"
 import { submitQuiz, getQuizById, getMySubmission } from "@/lib/api/quizzes"
-import { CheckCircle2, Award, Clock } from "lucide-react"
+import { CheckCircle2, Award, Clock, RefreshCw } from "lucide-react"
 
 interface Props {
   quiz: Quiz
@@ -17,6 +15,9 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
   const [submittedData, setSubmittedData] = useState<any>(null)
+  const [isOutdated, setIsOutdated] = useState(false)
+  const [pastSubmission, setPastSubmission] = useState<any>(null)
+  const [showPastScore, setShowPastScore] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -24,11 +25,15 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
       try {
         const [quizData, subStatus] = await Promise.all([
           getQuizById(projectId, initialQuiz.id),
-          getMySubmission(projectId, initialQuiz.id).catch(() => ({ submitted: false, submission: null })),
+          getMySubmission(projectId, initialQuiz.id).catch(() => ({ submitted: false, isOutdated: false, submission: null })),
         ])
         if (!cancelled) {
           setQuiz(quizData)
-          if (subStatus.submitted && subStatus.submission) {
+          if (subStatus.isOutdated) {
+            setIsOutdated(true)
+            setPastSubmission(subStatus.submission)
+            setSubmittedData(null)
+          } else if (subStatus.submitted && subStatus.submission) {
             setSubmittedData(subStatus.submission)
           }
           setLoading(false)
@@ -72,8 +77,8 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden border border-gray-100">
-        <div className="flex justify-between items-center p-5 border-b border-gray-200 bg-gray-50/50">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden border border-gray-200">
+        <div className="flex justify-between items-center p-5 border-b border-gray-200 bg-gray-50/50 flex-shrink-0">
           <div>
             <h2 className="text-xl font-bold text-gray-900">{initialQuiz.title}</h2>
             {submittedData && (
@@ -142,6 +147,32 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
             </div>
           ) : quiz ? (
             <>
+              {isOutdated && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-900 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 font-medium">
+                      <RefreshCw size={16} className="text-amber-700 flex-shrink-0" />
+                      <span>
+                        <strong>Quiz Updated:</strong> The project owner updated this quiz since your previous attempt. You can retake the updated version below.
+                      </span>
+                    </div>
+                    {pastSubmission && (
+                      <button
+                        onClick={() => setShowPastScore(!showPastScore)}
+                        className="text-amber-800 font-bold underline hover:text-amber-950 flex-shrink-0"
+                      >
+                        {showPastScore ? "Hide Previous Score" : "View Previous Score"}
+                      </button>
+                    )}
+                  </div>
+                  {showPastScore && pastSubmission && (
+                    <div className="pt-2 border-t border-amber-200/70 text-amber-900 font-medium">
+                      Previous attempt score: <strong>{pastSubmission.totalScore} pts</strong> (submitted on {new Date(pastSubmission.submittedAt).toLocaleDateString()})
+                    </div>
+                  )}
+                </div>
+              )}
+
               {quiz.description && (
                 <p className="text-gray-700 text-sm whitespace-pre-wrap leading-relaxed">{quiz.description}</p>
               )}

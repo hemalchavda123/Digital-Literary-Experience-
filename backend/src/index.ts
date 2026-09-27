@@ -66,8 +66,8 @@ app.use(
       // Allow non-browser or same-origin requests (no Origin header)
       if (!origin) return cb(null, true);
       if (allowedOrigins.includes(origin)) return cb(null, true);
-      // Also allow Vercel preview deployment URLs for this project
-      if (origin.match(/^https:\/\/digital-literary-experience.*\.vercel\.app$/)) return cb(null, true);
+      // Also allow Vercel preview deployment URLs for this project (strict match)
+      if (origin.match(/^https:\/\/digital-literary-experience(-[a-zA-Z0-9-]+)?\.vercel\.app$/)) return cb(null, true);
       return cb(new Error('Not allowed by CORS'));
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -76,8 +76,8 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ limit: '1mb', extended: true }));
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ limit: '500mb', extended: true }));
 
 // Routes
 app.use('/api/users', userRoutes);

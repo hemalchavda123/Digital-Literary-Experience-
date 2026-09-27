@@ -41,16 +41,16 @@ export function LabelManagerModal({ projectId, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="w-full max-w-md max-h-[85vh] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden border border-gray-200">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
           <h2 className="text-lg font-semibold text-gray-900">Manage Labels</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700">
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 p-1 hover:bg-gray-100 rounded-lg">
             <X size={20} />
           </button>
         </div>
 
-        <div className="p-6 flex-1 overflow-y-auto max-h-[60vh]">
+        <div className="p-6 flex-1 overflow-y-auto min-h-0">
           {labels.length === 0 ? (
             <p className="text-sm text-gray-500 mb-4">No labels have been created for this project yet.</p>
           ) : (

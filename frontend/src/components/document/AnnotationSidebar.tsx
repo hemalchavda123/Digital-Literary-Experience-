@@ -11,6 +11,7 @@ import { QuizTakeModal } from "@/components/project/QuizTakeModal"
 import { QuizSubmissionsModal } from "@/components/project/QuizSubmissionsModal"
 import { ManageQuizModal } from "@/components/project/ManageQuizModal"
 import { QuizAnalyticsModal } from "@/components/project/QuizAnalyticsModal"
+import { useRouter } from "next/navigation"
 import { Trash2, Edit2, Check, X, Send, MessageSquareText, Filter, X as CloseIcon, HelpCircle, BarChart2, Plus } from "lucide-react"
 
 type Props = {
@@ -34,6 +35,7 @@ export function AnnotationSidebar({
   projectId,
   docId,
 }: Props) {
+  const router = useRouter()
   const { labels, annotations, filteredAnnotations, filters, setFilters, clearFilters, editAnnotation, removeAnnotation, addComment, removeComment } = useAnnotations()
   const { quizzesForProject, fetchQuizzes } = useProjects()
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -47,7 +49,6 @@ export function AnnotationSidebar({
   const [takeQuizModal, setTakeQuizModal] = useState<Quiz | null>(null)
   const [manageQuizModal, setManageQuizModal] = useState<Quiz | null>(null)
   const [submissionsQuizModal, setSubmissionsQuizModal] = useState<Quiz | null>(null)
-  const [analyticsQuizModal, setAnalyticsQuizModal] = useState<Quiz | null>(null)
   const [annotationQuizzes, setAnnotationQuizzes] = useState<Record<string, Quiz>>({})
 
   // Get unique users from annotations for the person filter
@@ -335,7 +336,7 @@ export function AnnotationSidebar({
                               Submissions
                             </button>
                             <button
-                              onClick={() => setAnalyticsQuizModal(linkedQuiz)}
+                              onClick={() => projectId && router.push(`/project/${projectId}/quiz/${linkedQuiz.id}/analytics`)}
                               className="text-xs bg-purple-600 text-white hover:bg-purple-700 px-2.5 py-1 rounded font-semibold flex items-center gap-1 transition-colors shadow-sm"
                             >
                               <BarChart2 size={12} />
@@ -479,14 +480,6 @@ export function AnnotationSidebar({
         />
       )}
 
-      {analyticsQuizModal && projectId && (
-        <QuizAnalyticsModal
-          projectId={projectId}
-          quizId={analyticsQuizModal.id}
-          quizTitle={analyticsQuizModal.title}
-          onClose={() => setAnalyticsQuizModal(null)}
-        />
-      )}
     </div>
   )
 }
