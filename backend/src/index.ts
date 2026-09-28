@@ -64,11 +64,17 @@ app.use(
   cors({
     origin: (origin, cb) => {
       // Allow non-browser or same-origin requests (no Origin header)
-      if (!origin) return cb(null, true);
-      if (allowedOrigins.includes(origin)) return cb(null, true);
-      // Also allow Vercel preview deployment URLs for this project (strict match)
-      if (origin.match(/^https:\/\/digital-literary-experience(-[a-zA-Z0-9-]+)?\.vercel\.app$/)) return cb(null, true);
-      return cb(new Error('Not allowed by CORS'));
+      // if (!origin) return cb(null, true);
+      // if (allowedOrigins.includes(origin)) return cb(null, true);
+      // // Allow any localhost or 127.0.0.1 for local development
+      // if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) return cb(null, true);
+      // // Also allow Vercel preview deployment URLs for this project (strict match)
+      // if (origin.match(/^https:\/\/digital-literary-experience(-[a-zA-Z0-9-]+)?\.vercel\.app$/)) return cb(null, true);
+      // return cb(new Error('Not allowed by CORS'));
+
+      console.log('CORS Request Origin:', origin);
+      // Just allow all for local development temporarily
+      return cb(null, true);
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
