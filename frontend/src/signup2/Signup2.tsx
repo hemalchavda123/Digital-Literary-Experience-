@@ -7,10 +7,11 @@ import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google'
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 
 export default function Signup2(): JSX.Element {
-  const [viewIndex, setViewIndex] = useState<number>(0) // 0=signup,1=login,2=forgot
+  const [viewIndex, setViewIndex] = useState<number>(0) // 0=signup,1=login,2=forgot,3=verify
   const [isMobile, setIsMobile] = useState<boolean>(false)
   const [showSignupPassword, setShowSignupPassword] = useState(false)
   const [showLoginPassword, setShowLoginPassword] = useState(false)
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [message, setMessage] = useState<{ text: string; type: "error" | "success" } | null>(null)
   const router = useRouter()
@@ -64,24 +65,10 @@ export default function Signup2(): JSX.Element {
         return
       }
 
-      // Registration succeeded — auto-login
-      const loginRes = await fetch(`${API_BASE}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      })
-
-      const loginData = await loginRes.json()
-
-      if (!loginRes.ok) {
-        setMessage({ text: "Account created! Please sign in.", type: "success" })
-        setViewIndex(1)
-        setIsSubmitting(false)
-        return
-      }
-
-      setTokenCookie(loginData.accessToken, loginData.refreshToken)
-      router.push("/home")
+      // Registration succeeded - transition to verification step
+      setPendingVerificationEmail(email.trim().toLowerCase())
+      setMessage({ text: data.message || "Account created! Please check your email for the verification code.", type: "success" })
+      setViewIndex(3) // Transition to verify step
     } catch {
       setMessage({ text: "Network error. Is the backend running?", type: "error" })
     } finally {
@@ -111,12 +98,58 @@ export default function Signup2(): JSX.Element {
       if (!res.ok) {
         const errMsg = data?.error?.message || "Login failed"
         setMessage({ text: errMsg, type: "error" })
+        
+        // If email not verified, transition to verify step
+        if (data?.error?.code === 'EMAIL_NOT_VERIFIED') {
+          setPendingVerificationEmail(email.trim().toLowerCase())
+          setViewIndex(3)
+        }
+        
         setIsSubmitting(false)
         return
       }
 
       setTokenCookie(data.accessToken, data.refreshToken)
       router.push("/home")
+    } catch {
+      setMessage({ text: "Network error. Is the backend running?", type: "error" })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  async function handleVerify(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setIsSubmitting(true)
+    setMessage(null)
+
+    const form = e.currentTarget
+    const formData = new FormData(form)
+    const code = formData.get("code") as string
+
+    if (!pendingVerificationEmail) {
+      setMessage({ text: "Missing email address for verification.", type: "error" })
+      setIsSubmitting(false)
+      return
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/verify-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: pendingVerificationEmail, code }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        const errMsg = data?.error?.message || "Verification failed"
+        setMessage({ text: errMsg, type: "error" })
+      } else {
+        // Verification succeeded, auto-login with tokens
+        setTokenCookie(data.accessToken, data.refreshToken)
+        router.push("/home")
+      }
     } catch {
       setMessage({ text: "Network error. Is the backend running?", type: "error" })
     } finally {
@@ -548,6 +581,48 @@ export default function Signup2(): JSX.Element {
                         style={isSubmitting ? disabledButtonStyle : primaryButtonStyle}
                       >
                         {isSubmitting ? "Sending…" : "Send reset link"}
+                      </button>
+                    </form>
+
+                    <button
+                      onClick={() => { setViewIndex(1); setMessage(null) }}
+                      style={linkStyle}
+                    >
+                      Back to login
+                    </button>
+                  </div>
+
+                  {/* VERIFY EMAIL */}
+                  <div style={{ width: "100%", flexShrink: 0 }}>
+                    <h3 style={{ margin: 0, fontSize: 22, color: "#000" }}>
+                      Verify your email
+                    </h3>
+                    <p style={{ margin: "6px 0 18px", color: "#111827" }}>
+                      We sent a 6-digit code to <strong>{pendingVerificationEmail || "your email"}</strong>.
+                    </p>
+
+                    <form
+                      onSubmit={handleVerify}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 14,
+                      }}
+                    >
+                      <input
+                        name="code"
+                        type="text"
+                        placeholder="6-digit code"
+                        maxLength={6}
+                        required
+                        style={{ ...inputStyle, textAlign: "center", fontSize: 20, letterSpacing: 8, fontWeight: "bold" }}
+                      />
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        style={isSubmitting ? disabledButtonStyle : primaryButtonStyle}
+                      >
+                        {isSubmitting ? "Verifying…" : "Verify Email"}
                       </button>
                     </form>
 

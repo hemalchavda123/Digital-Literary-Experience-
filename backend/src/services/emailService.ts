@@ -81,6 +81,42 @@ export const sendPasswordResetEmail = async (email: string, resetToken: string, 
   }
 };
 
+export const sendVerificationEmail = async (email: string, code: string) => {
+  try {
+    const t = await createTransporter();
+    
+    const mailOptions = {
+      from: '"Digital Literary Studio" <noreply@digitalliterarystudio.com>',
+      to: email,
+      subject: 'Verify Your Email Address',
+      text: `Your verification code is: ${code}\n\nPlease enter this code to verify your account.`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #6b3f2c;">Verify Your Email Address</h2>
+          <p>Thank you for signing up for Digital Literary Studio!</p>
+          <p>Your verification code is:</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <span style="background-color: #f4f4f5; color: #333; padding: 12px 24px; border-radius: 8px; font-weight: bold; font-size: 24px; letter-spacing: 4px;">${code}</span>
+          </div>
+          <p style="color: #666; font-size: 14px;">Please enter this code on the verification screen to complete your registration.</p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="color: #999; font-size: 12px;">If you did not request this, please ignore this email.</p>
+        </div>
+      `,
+    };
+
+    const info = await t.sendMail(mailOptions);
+    console.log('Verification email sent to:', email);
+    
+    if (info.messageId && nodemailer.getTestMessageUrl(info)) {
+      console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
+    }
+  } catch (error) {
+    console.error('Error sending verification email:', error);
+  }
+};
+
 export default {
   sendPasswordResetEmail,
+  sendVerificationEmail,
 };

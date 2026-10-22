@@ -8,6 +8,7 @@ import {
   resetPassword,
   getCurrentUser,
   googleAuth,
+  verifyEmail,
 } from '../controllers/authController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import {
@@ -33,6 +34,7 @@ router.post('/refresh', refresh);
 router.post('/logout', logout);
 router.post('/forgot-password', validateForgotPassword, forgotPassword);
 router.post('/reset-password', validatePasswordReset, resetPassword);
+router.post('/verify-email', verifyEmail);
 router.post('/google', googleAuth);
 
 // Protected routes

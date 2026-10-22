@@ -17,6 +17,7 @@ export interface CreateUserInput {
   email: string;
   username: string;
   password: string; // hashed password
+  verificationCode?: string;
 }
 
 // User type without password field for safe returns
@@ -34,10 +35,27 @@ class UserService {
         email: data.email,
         username: data.username,
         password: data.password,
+        verificationCode: data.verificationCode,
       },
     });
 
     // Exclude password from returned user object
+    const { password, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+  }
+
+  /**
+   * Verify a user's email
+   */
+  async verifyUserEmail(userId: string): Promise<SafeUser> {
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        isVerified: true,
+        verificationCode: null,
+      },
+    });
+
     const { password, ...userWithoutPassword } = user;
     return userWithoutPassword;
   }

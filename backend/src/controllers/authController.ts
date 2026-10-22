@@ -114,16 +114,105 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     // Hash password
     const hashedPassword = await passwordService.hashPassword(password);
 
+    // Generate 6 digit verification code
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+
     // Create user
     const user = await userService.createUser({
       email: email.trim().toLowerCase(),
       username: username.trim(),
       password: hashedPassword,
+      verificationCode,
     });
 
-    res.status(201).json(user);
+    // Send verification email
+    await emailService.sendVerificationEmail(user.email, verificationCode);
+
+    res.status(201).json({ message: 'Registration successful. Please verify your email.', user });
   } catch (error) {
     console.error('Registration error:', error);
+    res.status(500).json({
+      error: {
+        message: 'An unexpected error occurred',
+        code: 'INTERNAL_ERROR',
+      },
+    });
+  }
+};
+
+/**
+ * Verify a user's email
+ * POST /api/auth/verify-email
+ * Body: { email, code }
+ */
+export const verifyEmail = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      res.status(400).json({
+        error: {
+          message: 'Email and verification code are required',
+          code: 'VALIDATION_ERROR',
+        },
+      });
+      return;
+    }
+
+    const user = await userService.findUserByEmail(email.trim().toLowerCase());
+    
+    if (!user) {
+      res.status(404).json({
+        error: {
+          message: 'User not found',
+          code: 'USER_NOT_FOUND',
+        },
+      });
+      return;
+    }
+
+    if (user.isVerified) {
+      res.status(400).json({
+        error: {
+          message: 'Email is already verified',
+          code: 'ALREADY_VERIFIED',
+        },
+      });
+      return;
+    }
+
+    if (user.verificationCode !== code) {
+      res.status(400).json({
+        error: {
+          message: 'Invalid verification code',
+          code: 'INVALID_CODE',
+        },
+      });
+      return;
+    }
+
+    // Verify user
+    const verifiedUser = await userService.verifyUserEmail(user.id);
+
+    // Generate tokens for auto login
+    const jwt = jwtService();
+    const accessToken = jwt.generateAccessToken({
+      userId: verifiedUser.id,
+      email: verifiedUser.email,
+      username: verifiedUser.username,
+    });
+    const refreshToken = jwt.generateRefreshToken({
+      userId: verifiedUser.id,
+    });
+
+    res.json({
+      message: 'Email verified successfully',
+      accessToken,
+      refreshToken,
+      user: verifiedUser,
+    });
+  } catch (error) {
+    console.error('Email verification error:', error);
     res.status(500).json({
       error: {
         message: 'An unexpected error occurred',
@@ -164,6 +253,16 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         error: {
           message: 'Invalid credentials',
           code: 'INVALID_CREDENTIALS',
+        },
+      });
+      return;
+    }
+
+    if (!user.isVerified) {
+      res.status(403).json({
+        error: {
+          message: 'Please verify your email address before logging in.',
+          code: 'EMAIL_NOT_VERIFIED',
         },
       });
       return;
