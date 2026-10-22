@@ -87,6 +87,22 @@ export async function createDocument(
   return res.json();
 }
 
+export async function importGoogleDriveDocument(data: {
+  projectId: string;
+  fileId?: string;
+  shareUrl?: string;
+  accessToken?: string;
+  title?: string;
+}): Promise<Document> {
+  const res = await authFetch(`${API_BASE_URL}/documents/import-google-drive`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await extractError(res, "Failed to import document from Google Drive"));
+  return res.json();
+}
+
 export async function updateDocument(
   id: string,
   updates: { title?: string; content?: string; pdfUrl?: string },

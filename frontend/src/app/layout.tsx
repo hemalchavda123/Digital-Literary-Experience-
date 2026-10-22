@@ -5,6 +5,8 @@ import { ProjectProvider } from '@/context/ProjectContext'
 import { AnnotationProvider } from '@/context/AnnotationContext'
 import { SocketProvider } from '@/context/SocketContext'
 
+import { ClientProviders } from '@/components/providers/ClientProviders'
+
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
@@ -20,15 +22,17 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <SocketProvider>
-          <ProjectProvider>
-            <AnnotationProvider>
-              <main className="min-h-screen flex flex-col">
-                {children}
-              </main>
-            </AnnotationProvider>
-          </ProjectProvider>
-        </SocketProvider>
+        <ClientProviders>
+          <SocketProvider>
+            <ProjectProvider>
+              <AnnotationProvider>
+                <main className="min-h-screen flex flex-col">
+                  {children}
+                </main>
+              </AnnotationProvider>
+            </ProjectProvider>
+          </SocketProvider>
+        </ClientProviders>
       </body>
     </html>
   )

@@ -26,6 +26,7 @@ type ProjectContextValue = {
   deleteProject: (id: string) => Promise<void>
   createDocument: (projectId: string, title: string) => Promise<Document>
   createPdfDocument: (projectId: string, title: string, content: string) => Promise<Document>
+  importGoogleDriveDocument: (projectId: string, data: { fileId?: string; shareUrl?: string; accessToken?: string; title?: string }) => Promise<Document>
   renameDocument: (id: string, title: string) => Promise<void>
   updateDocumentContent: (id: string, content: string) => Promise<void>
   deleteDocument: (id: string) => Promise<void>
@@ -361,6 +362,19 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     createPdfDocument: async (projectId, title, content) => {
       try {
         const doc = await api.createDocument(projectId, title, "pdf", content)
+        setDocumentCache((prev) => ({
+          ...prev,
+          [projectId]: [...(prev[projectId] ?? []), doc],
+        }))
+        return doc
+      } catch (error) {
+        throw error
+      }
+    },
+
+    importGoogleDriveDocument: async (projectId, data) => {
+      try {
+        const doc = await api.importGoogleDriveDocument({ projectId, ...data })
         setDocumentCache((prev) => ({
           ...prev,
           [projectId]: [...(prev[projectId] ?? []), doc],
