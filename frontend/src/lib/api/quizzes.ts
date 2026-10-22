@@ -66,6 +66,24 @@ export const deleteQuiz = async (projectId: string, quizId: string): Promise<voi
   if (!res.ok) throw new Error(await extractError(res, "Failed to delete quiz"));
 };
 
+export const publishQuestion = async (
+  projectId: string,
+  quizId: string,
+  questionId: string,
+  isPublished: boolean
+): Promise<any> => {
+  const res = await authFetch(
+    `${API_BASE_URL}/projects/${projectId}/quizzes/${quizId}/questions/${questionId}/publish`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isPublished }),
+    }
+  );
+  if (!res.ok) throw new Error(await extractError(res, "Failed to update question publish status"));
+  return res.json();
+};
+
 export const submitQuiz = async (
   projectId: string,
   quizId: string,

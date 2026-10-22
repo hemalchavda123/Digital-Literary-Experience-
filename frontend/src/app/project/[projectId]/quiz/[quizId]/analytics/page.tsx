@@ -6,7 +6,6 @@ import { getQuizAnalytics } from "@/lib/api/quizzes"
 import { getProjectById } from "@/lib/api/projects"
 import type { QuizAnalytics, QuestionBreakdown, ResponseDistributionItem } from "@/types/quiz"
 import Navbar from "@/components/Navbar"
-import Footer from "@/components/Footer"
 import {
   ArrowLeft,
   PieChart,
@@ -381,7 +380,6 @@ export default function QuizAnalyticsPage() {
         ) : null}
       </main>
 
-      <Footer />
     </div>
   )
 }

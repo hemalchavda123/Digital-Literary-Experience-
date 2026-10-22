@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import type { Quiz, QuizQuestion } from "@/types/quiz"
 import { submitQuiz, getQuizById, getMySubmission } from "@/lib/api/quizzes"
+import { useSocket } from "@/context/SocketContext"
 import { CheckCircle2, Award, Clock, RefreshCw } from "lucide-react"
 
 interface Props {
@@ -18,38 +19,82 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
   const [isOutdated, setIsOutdated] = useState(false)
   const [pastSubmission, setPastSubmission] = useState<any>(null)
   const [showPastScore, setShowPastScore] = useState(false)
+  const [newQuestionNotice, setNewQuestionNotice] = useState<string | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      try {
-        const [quizData, subStatus] = await Promise.all([
-          getQuizById(projectId, initialQuiz.id),
-          getMySubmission(projectId, initialQuiz.id).catch(() => ({ submitted: false, isOutdated: false, submission: null })),
-        ])
-        if (!cancelled) {
-          setQuiz(quizData)
-          if (subStatus.isOutdated) {
-            setIsOutdated(true)
-            setPastSubmission(subStatus.submission)
-            setSubmittedData(null)
-          } else if (subStatus.submitted && subStatus.submission) {
-            setSubmittedData(subStatus.submission)
+  const { socket, joinProject } = useSocket()
+
+  const refreshQuizData = useCallback(async (showNotice = false) => {
+    try {
+      const [quizData, subStatus] = await Promise.all([
+        getQuizById(projectId, initialQuiz.id),
+        getMySubmission(projectId, initialQuiz.id).catch(() => ({ submitted: false, isOutdated: false, submission: null })),
+      ])
+
+      setQuiz((prevQuiz) => {
+        if (showNotice && prevQuiz?.questions && quizData?.questions) {
+          const prevCount = prevQuiz.questions.length
+          const newCount = quizData.questions.length
+          if (newCount > prevCount) {
+            setNewQuestionNotice(`A new question has been published (${newCount - prevCount} new question${newCount - prevCount > 1 ? "s" : ""} added)!`)
           }
-          setLoading(false)
         }
-      } catch (err) {
-        if (!cancelled) {
-          console.error("Failed to load quiz", err)
-          setLoading(false)
-        }
+        return quizData
+      })
+
+      if (subStatus.isOutdated) {
+        setIsOutdated(true)
+        setPastSubmission(subStatus.submission)
+        setSubmittedData(null)
+      } else if (subStatus.submitted && subStatus.submission) {
+        setSubmittedData(subStatus.submission)
       }
-    }
-    load()
-    return () => {
-      cancelled = true
+      setLoading(false)
+    } catch (err) {
+      console.error("Failed to load quiz", err)
+      setLoading(false)
     }
   }, [projectId, initialQuiz.id])
+
+  useEffect(() => {
+    refreshQuizData(false)
+  }, [refreshQuizData])
+
+  useEffect(() => {
+    if (projectId) {
+      joinProject(projectId)
+    }
+  }, [projectId, joinProject])
+
+  useEffect(() => {
+    if (!socket) return
+
+    const handleQuizUpdated = (data: { quizId: string; projectId: string }) => {
+      if (data.quizId === initialQuiz.id) {
+        refreshQuizData(true)
+      }
+    }
+
+    const handleQuestionPublished = (data: { quizId: string; projectId: string }) => {
+      if (data.quizId === initialQuiz.id) {
+        refreshQuizData(true)
+      }
+    }
+
+    socket.on("quiz_updated", handleQuizUpdated)
+    socket.on("question_published", handleQuestionPublished)
+
+    return () => {
+      socket.off("quiz_updated", handleQuizUpdated)
+      socket.off("question_published", handleQuestionPublished)
+    }
+  }, [socket, initialQuiz.id, refreshQuizData])
+
+  useEffect(() => {
+    if (newQuestionNotice) {
+      const timer = setTimeout(() => setNewQuestionNotice(null), 6000)
+      return () => clearTimeout(timer)
+    }
+  }, [newQuestionNotice])
 
   const handleAnswerChange = (questionId: string, value: string) => {
     setAnswers((prev) => ({ ...prev, [questionId]: value }))
@@ -170,6 +215,16 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
                       Previous attempt score: <strong>{pastSubmission.totalScore} pts</strong> (submitted on {new Date(pastSubmission.submittedAt).toLocaleDateString()})
                     </div>
                   )}
+                </div>
+              )}
+
+              {newQuestionNotice && (
+                <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs px-4 py-2.5 rounded-lg flex items-center justify-between shadow-sm">
+                  <span className="font-semibold flex items-center gap-1.5">
+                    <CheckCircle2 size={14} className="text-emerald-600" />
+                    {newQuestionNotice}
+                  </span>
+                  <button onClick={() => setNewQuestionNotice(null)} className="text-emerald-700 hover:text-emerald-900 font-bold ml-2">✕</button>
                 </div>
               )}
 

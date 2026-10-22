@@ -24,7 +24,7 @@ interface TempQuestion {
 let tempQuestionIdCounter = 0
 
 export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
-  const { updateQuiz } = useProjects()
+  const { updateQuiz, publishQuestion } = useProjects()
   const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit")
   const [loading, setLoading] = useState(true)
   
@@ -81,6 +81,20 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
 
   const updateQuestion = (id: string | number, field: keyof TempQuestion, value: any) => {
     setQuestions(questions.map((q) => (q.id === id ? { ...q, [field]: value } : q)))
+  }
+
+  const handleTogglePublish = async (q: TempQuestion, newPublishedState: boolean) => {
+    updateQuestion(q.id, "isPublished", newPublishedState)
+
+    if (typeof q.id === "string" && !q.id.startsWith("temp-")) {
+      try {
+        await publishQuestion(projectId, quizId, q.id, newPublishedState)
+      } catch (err: any) {
+        console.error("Failed to toggle question publish state", err)
+        updateQuestion(q.id, "isPublished", !newPublishedState)
+        alert(err.message || "Failed to update question publish state.")
+      }
+    }
   }
 
   const updateOption = (questionId: string | number, optionIndex: number, value: string) => {
@@ -228,7 +242,7 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
                           <label className="flex items-center cursor-pointer gap-2">
                             <span className="text-xs text-gray-500 font-medium">{q.isPublished ? "Published" : "Draft"}</span>
                             <div className="relative">
-                              <input type="checkbox" className="sr-only" checked={q.isPublished} onChange={(e) => updateQuestion(q.id, "isPublished", e.target.checked)} />
+                              <input type="checkbox" className="sr-only" checked={q.isPublished} onChange={(e) => handleTogglePublish(q, e.target.checked)} />
                               <div className={`block w-10 h-6 rounded-full transition-colors ${q.isPublished ? 'bg-green-500' : 'bg-gray-300'}`}></div>
                               <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${q.isPublished ? 'transform translate-x-4' : ''}`}></div>
                             </div>

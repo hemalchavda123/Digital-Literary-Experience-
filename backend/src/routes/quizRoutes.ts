@@ -5,6 +5,7 @@ import {
   createQuiz,
   updateQuiz,
   deleteQuiz,
+  togglePublishQuestion,
   submitQuiz,
   getMySubmission,
   getSubmissions,
@@ -24,6 +25,7 @@ router.post('/', createQuiz);
 router.get('/document/:docId/analytics', getPdfQuizAnalytics);
 router.get('/:quizId', getQuizById);
 router.put('/:quizId', updateQuiz);
+router.patch('/:quizId/questions/:questionId/publish', togglePublishQuestion);
 router.delete('/:quizId', deleteQuiz);
 
 // Submissions

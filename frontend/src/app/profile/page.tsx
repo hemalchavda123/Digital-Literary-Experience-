@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Navbar from "@/components/Navbar"
-import Footer from "@/components/Footer"
 import { logout } from "@/app/auth/actions"
 import { getCurrentUser, updateProfileImage } from "@/lib/api/users"
 
@@ -96,7 +95,6 @@ export default function ProfilePage() {
         <main className="flex-1 flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
         </main>
-        <Footer />
       </div>
     )
   }
@@ -211,7 +209,6 @@ export default function ProfilePage() {
       </div>
     </main>
 
-      <Footer />
     </div>
   )
 }

@@ -2,7 +2,6 @@
 
 import { useParams, useRouter } from "next/navigation"
 import Navbar from "@/components/Navbar"
-import Footer from "@/components/Footer"
 import { useProjects } from "@/context/ProjectContext"
 import { DocumentList } from "@/components/project/DocumentList"
 import { CreateDocumentButton } from "@/components/project/CreateDocumentButton"
@@ -78,7 +77,6 @@ export default function ProjectPage() {
         <main className="flex-1 flex items-center justify-center">
           <p className="text-sm text-gray-500">Loading…</p>
         </main>
-        <Footer />
       </div>
     )
   }
@@ -94,7 +92,6 @@ export default function ProjectPage() {
         <main className="flex-1 flex items-center justify-center">
           <p className="text-sm text-gray-500">Loading…</p>
         </main>
-        <Footer />
       </div>
     )
   }
@@ -115,7 +112,6 @@ export default function ProjectPage() {
             </button>
           </div>
         </main>
-        <Footer />
       </div>
     )
   }
@@ -245,7 +241,6 @@ export default function ProjectPage() {
           </div>
         </div>
       </main>
-      <Footer />
       <ShareModal 
         isOpen={isShareModalOpen} 
         onClose={() => setIsShareModalOpen(false)} 

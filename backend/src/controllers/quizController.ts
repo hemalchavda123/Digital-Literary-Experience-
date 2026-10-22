@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import prisma from '../config/db';
+import { getIo } from '../socket';
 
 // Helper to check project membership or ownership
 async function checkProjectAccess(projectId: string, userId: string) {
@@ -122,8 +123,17 @@ export const createQuiz = async (req: Request, res: Response, next: NextFunction
       },
       include: {
         questions: true,
+        _count: {
+          select: { questions: true, submissions: true },
+        },
       },
     });
+
+    try {
+      getIo().to(`project:${projectId}`).emit('quiz_created', newQuiz);
+    } catch (e) {
+      console.error('Socket emit error (quiz_created):', e);
+    }
 
     res.status(201).json(newQuiz);
   } catch (error) {
@@ -210,6 +220,7 @@ export const updateQuiz = async (req: Request, res: Response, next: NextFunction
     const updatedQuiz = await prisma.quiz.update({
       where: { id: quizId },
       data: {
+        updatedAt: new Date(),
         ...(title !== undefined ? { title } : {}),
         ...(description !== undefined ? { description } : {}),
         ...(status !== undefined ? { status } : {}),
@@ -218,6 +229,9 @@ export const updateQuiz = async (req: Request, res: Response, next: NextFunction
       },
       include: {
         questions: { orderBy: { order: 'asc' } },
+        _count: {
+          select: { questions: true, submissions: true },
+        },
       },
     });
 
@@ -237,6 +251,16 @@ export const updateQuiz = async (req: Request, res: Response, next: NextFunction
           data: { totalScore: newScore },
         });
       }
+    }
+
+    try {
+      getIo().to(`project:${projectId}`).emit('quiz_updated', {
+        projectId,
+        quizId,
+        quiz: updatedQuiz,
+      });
+    } catch (e) {
+      console.error('Socket emit error (quiz_updated):', e);
     }
 
     res.json(updatedQuiz);
@@ -260,7 +284,77 @@ export const deleteQuiz = async (req: Request, res: Response, next: NextFunction
       where: { id: quizId },
     });
 
+    try {
+      getIo().to(`project:${projectId}`).emit('quiz_deleted', {
+        projectId,
+        quizId,
+      });
+    } catch (e) {
+      console.error('Socket emit error (quiz_deleted):', e);
+    }
+
     res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const togglePublishQuestion = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const projectId = req.params.projectId as string;
+    const quizId = req.params.quizId as string;
+    const questionId = req.params.questionId as string;
+    const userId = (req as any).user?.userId;
+    const { isPublished } = req.body;
+
+    const { isOwner } = await checkProjectAccess(projectId, userId);
+    if (!isOwner) {
+      return res.status(403).json({ message: 'Only project owner can manage quiz questions' });
+    }
+
+    const question = await prisma.quizQuestion.findUnique({
+      where: { id: questionId },
+    });
+
+    if (!question || question.quizId !== quizId) {
+      return res.status(404).json({ message: 'Question not found in this quiz' });
+    }
+
+    const updatedQuestion = await prisma.quizQuestion.update({
+      where: { id: questionId },
+      data: { isPublished: isPublished !== undefined ? Boolean(isPublished) : !question.isPublished },
+    });
+
+    // Touch quiz updatedAt so clients and submissions know the quiz was updated
+    const updatedQuiz = await prisma.quiz.update({
+      where: { id: quizId },
+      data: { updatedAt: new Date() },
+      include: {
+        questions: { orderBy: { order: 'asc' } },
+        _count: {
+          select: { questions: true, submissions: true },
+        },
+      },
+    });
+
+    try {
+      getIo().to(`project:${projectId}`).emit('question_published', {
+        projectId,
+        quizId,
+        questionId,
+        isPublished: updatedQuestion.isPublished,
+      });
+
+      getIo().to(`project:${projectId}`).emit('quiz_updated', {
+        projectId,
+        quizId,
+        quiz: updatedQuiz,
+      });
+    } catch (e) {
+      console.error('Socket emit error (question_published):', e);
+    }
+
+    res.json(updatedQuestion);
   } catch (error) {
     next(error);
   }

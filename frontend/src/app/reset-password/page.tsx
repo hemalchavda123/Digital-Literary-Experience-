@@ -2,7 +2,6 @@
 
 import React, { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Footer from "@/components/Footer";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
@@ -133,9 +132,7 @@ export default function ResetPassword() {
       <Suspense fallback={<div className="relative z-10 text-center text-black">Loading...</div>}>
         <ResetPasswordForm />
       </Suspense>
-      <div className="relative z-10 mt-auto">
-        <Footer />
-      </div>
+
     </div>
   );
 }

@@ -2,7 +2,6 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Navbar from "@/components/Navbar"
-import Footer from "@/components/Footer"
 import { SearchBar } from "@/components/dashboard/SearchBar"
 import { FilterDropdown } from "@/components/dashboard/FilterDropdown"
 import { ProjectGrid } from "@/components/dashboard/ProjectGrid"
@@ -158,7 +157,6 @@ export default function HomePage() {
         </div>
       </main>
 
-      <Footer />
       <CreateProjectModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
     </div>
   )

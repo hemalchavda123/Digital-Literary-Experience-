@@ -46,6 +46,7 @@ type ProjectContextValue = {
   createQuiz: (projectId: string, payload: { title: string; description: string; status: string; questions: any[] }) => Promise<Quiz>
   updateQuiz: (projectId: string, quizId: string, payload: { title: string; description: string; status: string; questions?: any[] }) => Promise<Quiz>
   deleteQuiz: (projectId: string, quizId: string) => Promise<void>
+  publishQuestion: (projectId: string, quizId: string, questionId: string, isPublished: boolean) => Promise<any>
 }
 
 const ProjectContext = createContext<ProjectContextValue | undefined>(undefined)
@@ -240,6 +241,79 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       socket.off('assignment_created', onAssignmentCreated)
       socket.off('assignment_deleted', onAssignmentDeleted)
       socket.off('assignment_status_updated', onAssignmentStatusUpdated)
+    }
+  }, [socket])
+
+  // Quiz socket listeners
+  useEffect(() => {
+    if (!socket) return
+
+    const onQuizCreated = (quiz: Quiz) => {
+      setQuizCache((prev) => {
+        const projectId = quiz.projectId
+        const existing = prev[projectId] ?? []
+        if (existing.some((q) => q.id === quiz.id)) return prev
+        return { ...prev, [projectId]: [quiz, ...existing] }
+      })
+    }
+
+    const onQuizUpdated = ({
+      projectId,
+      quizId,
+      quiz,
+    }: {
+      projectId: string
+      quizId: string
+      quiz?: Quiz
+    }) => {
+      if (quiz) {
+        setQuizCache((prev) => {
+          const next = { ...prev }
+          if (!next[projectId]) return prev
+          next[projectId] = next[projectId].map((q) => (q.id === quizId ? { ...q, ...quiz } : q))
+          return next
+        })
+      }
+      quizApi.getQuizzes(projectId).then((items) => {
+        setQuizCache((prev) => ({ ...prev, [projectId]: items }))
+      }).catch(() => {})
+    }
+
+    const onQuizDeleted = ({
+      projectId,
+      quizId,
+    }: {
+      projectId: string
+      quizId: string
+    }) => {
+      setQuizCache((prev) => {
+        const next = { ...prev }
+        if (!next[projectId]) return prev
+        next[projectId] = next[projectId].filter((q) => q.id !== quizId)
+        return next
+      })
+    }
+
+    const onQuestionPublished = ({
+      projectId,
+    }: {
+      projectId: string
+    }) => {
+      quizApi.getQuizzes(projectId).then((items) => {
+        setQuizCache((prev) => ({ ...prev, [projectId]: items }))
+      }).catch(() => {})
+    }
+
+    socket.on('quiz_created', onQuizCreated)
+    socket.on('quiz_updated', onQuizUpdated)
+    socket.on('quiz_deleted', onQuizDeleted)
+    socket.on('question_published', onQuestionPublished)
+
+    return () => {
+      socket.off('quiz_created', onQuizCreated)
+      socket.off('quiz_updated', onQuizUpdated)
+      socket.off('quiz_deleted', onQuizDeleted)
+      socket.off('question_published', onQuestionPublished)
     }
   }, [socket])
 
@@ -757,6 +831,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
     fetchQuizzes: async (projectId) => {
       try {
+        joinProject(projectId)
         const items = await quizApi.getQuizzes(projectId)
         setQuizCache((prev) => ({ ...prev, [projectId]: items }))
         return items
@@ -801,6 +876,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         throw error
       }
+    },
+
+    publishQuestion: async (projectId, quizId, questionId, isPublished) => {
+      return await quizApi.publishQuestion(projectId, quizId, questionId, isPublished)
     },
 
   }), [projects, documentCache, announcementCache, assignmentCache, quizCache, loading, error, refreshProjects, joinProject, leaveProject])

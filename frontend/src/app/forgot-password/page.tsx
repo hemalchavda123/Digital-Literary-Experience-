@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { forgotPassword } from '../auth/actions'
-import Footer from '@/components/Footer'
 
 export default async function ForgotPassword({
     searchParams,
@@ -66,7 +65,6 @@ export default async function ForgotPassword({
                 )}
             </form>
 
-            <Footer />
         </div>
     )
 }
