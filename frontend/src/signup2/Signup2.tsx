@@ -9,7 +9,6 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 export default function Signup2(): JSX.Element {
   const [viewIndex, setViewIndex] = useState<number>(0) // 0=signup,1=login,2=forgot,3=verify
   const [isMobile, setIsMobile] = useState<boolean>(false)
-  const [showSignupPassword, setShowSignupPassword] = useState(false)
   const [showLoginPassword, setShowLoginPassword] = useState(false)
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -34,47 +33,6 @@ export default function Signup2(): JSX.Element {
   }
 
   /* ---- form handlers ---- */
-
-  async function handleSignup(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setIsSubmitting(true)
-    setMessage(null)
-
-    const form = e.currentTarget
-    const formData = new FormData(form)
-    const username = formData.get("username") as string
-    const email = formData.get("email") as string
-    const password = formData.get("password") as string
-
-    try {
-      const res = await fetch(`${API_BASE}/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, email, password }),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        const errMsg =
-          data?.error?.details
-            ? Object.values(data.error.details).flat().join(". ")
-            : data?.error?.message || "Registration failed"
-        setMessage({ text: errMsg, type: "error" })
-        setIsSubmitting(false)
-        return
-      }
-
-      // Registration succeeded - transition to verification step
-      setPendingVerificationEmail(email.trim().toLowerCase())
-      setMessage({ text: data.message || "Account created! Please check your email for the verification code.", type: "success" })
-      setViewIndex(3) // Transition to verify step
-    } catch {
-      setMessage({ text: "Network error. Is the backend running?", type: "error" })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -395,60 +353,11 @@ export default function Signup2(): JSX.Element {
                     <h3 style={{ margin: 0, fontSize: 22, color: "#000" }}>
                       Create account
                     </h3>
-                    <p style={{ margin: "6px 0 18px", color: "#111827" }}>
-                      Join us — it only takes a minute.
+                    <p style={{ margin: "6px 0 20px", color: "#111827" }}>
+                      Sign up with your Google account.
                     </p>
 
-                    <form
-                      onSubmit={handleSignup}
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 14,
-                      }}
-                    >
-                      <input
-                        name="username"
-                        placeholder="Full name"
-                        required
-                        minLength={3}
-                        style={inputStyle}
-                      />
-                      <input
-                        name="email"
-                        type="email"
-                        placeholder="Email"
-                        required
-                        style={inputStyle}
-                      />
-                      <div style={{ position: "relative" }}>
-                        <input
-                          name="password"
-                          type={showSignupPassword ? "text" : "password"}
-                          placeholder="Password"
-                          required
-                          minLength={8}
-                          style={{ ...inputStyle, paddingRight: 42 }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowSignupPassword(!showSignupPassword)}
-                          style={eyeButtonStyle}
-                          aria-label={showSignupPassword ? "Hide password" : "Show password"}
-                        >
-                          {showSignupPassword ? <EyeOffIcon /> : <EyeIcon />}
-                        </button>
-                      </div>
-                      <button
-                        type="submit"
-                        disabled={isSubmitting}
-                        style={isSubmitting ? disabledButtonStyle : primaryButtonStyle}
-                      >
-                        {isSubmitting ? "Signing up…" : "Sign up"}
-                      </button>
-                    </form>
-
-                    <div style={{ marginTop: 16, marginBottom: 8, display: 'flex', justifyContent: 'center' }}>
+                    <div style={{ margin: "32px 0 20px", display: 'flex', justifyContent: 'center' }}>
                       <GoogleLogin
                         onSuccess={handleGoogleSuccess}
                         onError={() => {
