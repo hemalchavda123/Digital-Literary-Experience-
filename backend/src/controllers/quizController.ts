@@ -179,13 +179,11 @@ export const updateQuiz = async (req: Request, res: Response, next: NextFunction
           const typeChanged = existing.type !== q.type;
           const optionsChanged = existing.options !== formattedOptions;
           const answerChanged = (existing.correctAnswer || '') !== (q.correctAnswer || '');
+          const marksChanged = existing.marks !== (q.marks || 1);
+          const isModified = textChanged || typeChanged || optionsChanged || answerChanged || marksChanged;
 
-          if (textChanged || typeChanged || optionsChanged || answerChanged) {
-            // Question was modified -> delete past responses for this specific question
-            await prisma.quizAnswer.deleteMany({ where: { questionId: q.id } });
-          }
-
-          // Update question properties
+          // DO NOT delete past responses! Keep previous submitted answers stored and available.
+          // Update question properties. If modified, set updatedAt to now.
           await prisma.quizQuestion.update({
             where: { id: q.id },
             data: {
@@ -196,6 +194,7 @@ export const updateQuiz = async (req: Request, res: Response, next: NextFunction
               marks: q.marks || 1,
               correctAnswer: q.correctAnswer || null,
               isPublished: q.isPublished !== undefined ? q.isPublished : true,
+              ...(isModified ? { updatedAt: new Date() } : {}),
             },
           });
         } else {
@@ -374,68 +373,119 @@ export const submitQuiz = async (req: Request, res: Response, next: NextFunction
 
     const quiz = await prisma.quiz.findUnique({
       where: { id: quizId },
-      include: { questions: true },
+      include: {
+        questions: {
+          where: { isPublished: true },
+          orderBy: { order: 'asc' },
+        },
+      },
     });
 
     if (!quiz || quiz.status !== 'PUBLISHED' || quiz.projectId !== projectId) {
       return res.status(404).json({ message: 'Quiz not found or not published' });
     }
 
-    // CHECK FOR EXISTING SUBMISSION (Allow retake if quiz was updated after submission)
+    // CHECK FOR EXISTING SUBMISSION
     const existingSubmission = await prisma.quizSubmission.findUnique({
       where: { quizId_userId: { quizId, userId } },
       include: { answers: true },
     });
 
-    if (existingSubmission) {
-      const isOutdated = quiz.updatedAt && new Date(quiz.updatedAt).getTime() > new Date(existingSubmission.submittedAt).getTime();
+    const subSubmittedAt = existingSubmission ? new Date(existingSubmission.submittedAt).getTime() : 0;
+    const prevAnswersMap = new Map((existingSubmission?.answers || []).map((a) => [a.questionId, a]));
+    const incomingAnswersMap = new Map<string, string>(
+      (answers || []).map((a: any) => [String(a.questionId), String(a.answerText || '')])
+    );
 
-      if (!isOutdated) {
-        return res.status(400).json({
-          message: 'You have already submitted the latest version of this quiz',
-          alreadySubmitted: true,
-          submission: existingSubmission,
-        });
+    let totalScore = 0;
+    const finalAnswerData: { questionId: string; answerText: string; isCorrect: boolean | null; score: number }[] = [];
+
+    for (const question of quiz.questions) {
+      const prevAns = prevAnswersMap.get(question.id);
+      const qUpdatedAt = question.updatedAt ? new Date(question.updatedAt).getTime() : 0;
+      // An existing question is UNCHANGED if user previously answered it and question was NOT updated after user's submission
+      const isUnchanged = Boolean(existingSubmission && prevAns && qUpdatedAt <= subSubmittedAt);
+
+      let answerText = '';
+      if (isUnchanged && prevAns) {
+        // Strictly preserve previously submitted answer for unchanged questions
+        answerText = prevAns.answerText;
+      } else {
+        // For new or modified questions, accept the incoming answer
+        answerText = incomingAnswersMap.get(question.id) || '';
       }
 
-      // Quiz was updated by owner after previous attempt -> delete old submission so student can submit new attempt
-      await prisma.quizSubmission.delete({
-        where: { id: existingSubmission.id },
-      });
-    }
-
-    // Calculate score
-    let totalScore = 0;
-    const answerData = (answers || []).map((ans: any) => {
-      const question = quiz.questions.find((q: any) => q.id === ans.questionId);
-      let isCorrect = null;
+      // Grade the answer
+      let isCorrect: boolean | null = null;
       let score = 0;
-
-      if (question && question.correctAnswer) {
-        isCorrect = ans.answerText.trim().toLowerCase() === question.correctAnswer.trim().toLowerCase();
+      if (question.correctAnswer) {
+        isCorrect = answerText.trim().toLowerCase() === question.correctAnswer.trim().toLowerCase();
         score = isCorrect ? question.marks : 0;
+        totalScore += score;
+      } else if (isUnchanged && prevAns) {
+        score = prevAns.score || 0;
+        isCorrect = prevAns.isCorrect;
         totalScore += score;
       }
 
-      return {
-        questionId: ans.questionId,
-        answerText: ans.answerText || '',
+      finalAnswerData.push({
+        questionId: question.id,
+        answerText,
         isCorrect,
         score,
-      };
-    });
+      });
+    }
 
-    const submission = await prisma.quizSubmission.create({
-      data: {
-        quizId,
-        userId,
-        totalScore,
-        answers: {
-          create: answerData,
+    let submission;
+
+    if (existingSubmission) {
+      // Archive previous attempt into history
+      const previousHistory = Array.isArray(existingSubmission.history) ? (existingSubmission.history as any[]) : [];
+      const attemptSnapshot = {
+        attemptNumber: previousHistory.length + 1,
+        submittedAt: existingSubmission.submittedAt,
+        totalScore: existingSubmission.totalScore,
+        answers: existingSubmission.answers.map((a) => ({
+          questionId: a.questionId,
+          answerText: a.answerText,
+          isCorrect: a.isCorrect,
+          score: a.score,
+        })),
+      };
+
+      const updatedHistory = [...previousHistory, attemptSnapshot];
+
+      // Delete old answers and create updated merged answers
+      await prisma.quizAnswer.deleteMany({
+        where: { submissionId: existingSubmission.id },
+      });
+
+      submission = await prisma.quizSubmission.update({
+        where: { id: existingSubmission.id },
+        data: {
+          submittedAt: new Date(),
+          totalScore,
+          history: updatedHistory,
+          answers: {
+            create: finalAnswerData,
+          },
         },
-      },
-      include: { answers: true },
-    });
+        include: { answers: true },
+      });
+    } else {
+      submission = await prisma.quizSubmission.create({
+        data: {
+          quizId,
+          userId,
+          totalScore,
+          history: [],
+          answers: {
+            create: finalAnswerData,
+          },
+        },
+        include: { answers: true },
+      });
+    }
 
     res.status(201).json(submission);
   } catch (error) {
@@ -456,9 +506,13 @@ export const getMySubmission = async (req: Request, res: Response, next: NextFun
 
     const quiz = await prisma.quiz.findUnique({
       where: { id: quizId },
-      include: { questions: true },
+      include: {
+        questions: {
+          where: { isPublished: true },
+          orderBy: { order: 'asc' },
+        },
+      },
     });
-    const validQuestionIds = new Set((quiz?.questions || []).map((q) => q.id));
 
     const submission = await prisma.quizSubmission.findUnique({
       where: { quizId_userId: { quizId, userId } },
@@ -467,11 +521,61 @@ export const getMySubmission = async (req: Request, res: Response, next: NextFun
       },
     });
 
-    let isOutdated = false;
-    if (submission && quiz && quiz.updatedAt) {
-      isOutdated = new Date(quiz.updatedAt).getTime() > new Date(submission.submittedAt).getTime();
+    const questionStates: Record<
+      string,
+      {
+        status: 'UNCHANGED' | 'MODIFIED' | 'NEW';
+        previousAnswer: string | null;
+        score: number | null;
+        isCorrect: boolean | null;
+      }
+    > = {};
+
+    let hasPendingChanges = false;
+
+    if (submission && quiz) {
+      const answersMap = new Map(submission.answers.map((a) => [a.questionId, a]));
+      const subSubmittedAt = new Date(submission.submittedAt).getTime();
+
+      for (const q of quiz.questions) {
+        const prevAns = answersMap.get(q.id);
+
+        if (!prevAns) {
+          // New question added/published since submission
+          questionStates[q.id] = {
+            status: 'NEW',
+            previousAnswer: null,
+            score: null,
+            isCorrect: null,
+          };
+          hasPendingChanges = true;
+        } else {
+          const qUpdatedAt = q.updatedAt ? new Date(q.updatedAt).getTime() : 0;
+          const wasModified = qUpdatedAt > subSubmittedAt;
+
+          if (wasModified) {
+            questionStates[q.id] = {
+              status: 'MODIFIED',
+              previousAnswer: prevAns.answerText,
+              score: prevAns.score,
+              isCorrect: prevAns.isCorrect,
+            };
+            hasPendingChanges = true;
+          } else {
+            questionStates[q.id] = {
+              status: 'UNCHANGED',
+              previousAnswer: prevAns.answerText,
+              score: prevAns.score,
+              isCorrect: prevAns.isCorrect,
+            };
+          }
+        }
+      }
     }
 
+    const isOutdated = !!submission && hasPendingChanges;
+
+    const validQuestionIds = new Set((quiz?.questions || []).map((q) => q.id));
     if (submission) {
       submission.answers = submission.answers.filter((a) => validQuestionIds.has(a.questionId));
       submission.totalScore = submission.answers.reduce((sum, a) => sum + (a.score || 0), 0);
@@ -481,6 +585,7 @@ export const getMySubmission = async (req: Request, res: Response, next: NextFun
       submitted: !!submission && !isOutdated,
       isOutdated,
       submission,
+      questionStates,
     });
   } catch (error) {
     next(error);

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react"
 import type { Quiz, QuizQuestion } from "@/types/quiz"
 import { submitQuiz, getQuizById, getMySubmission } from "@/lib/api/quizzes"
 import { useSocket } from "@/context/SocketContext"
-import { CheckCircle2, Award, Clock, RefreshCw } from "lucide-react"
+import { CheckCircle2, Award, Clock, RefreshCw, Lock, Sparkles } from "lucide-react"
 
 interface Props {
   quiz: Quiz
@@ -20,6 +20,17 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
   const [pastSubmission, setPastSubmission] = useState<any>(null)
   const [showPastScore, setShowPastScore] = useState(false)
   const [newQuestionNotice, setNewQuestionNotice] = useState<string | null>(null)
+  const [questionStates, setQuestionStates] = useState<
+    Record<
+      string,
+      {
+        status: "UNCHANGED" | "MODIFIED" | "NEW"
+        previousAnswer: string | null
+        score: number | null
+        isCorrect: boolean | null
+      }
+    >
+  >({})
 
   const { socket, joinProject } = useSocket()
 
@@ -27,7 +38,12 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
     try {
       const [quizData, subStatus] = await Promise.all([
         getQuizById(projectId, initialQuiz.id),
-        getMySubmission(projectId, initialQuiz.id).catch(() => ({ submitted: false, isOutdated: false, submission: null })),
+        getMySubmission(projectId, initialQuiz.id).catch(() => ({
+          submitted: false,
+          isOutdated: false,
+          submission: null,
+          questionStates: {},
+        })),
       ])
 
       setQuiz((prevQuiz) => {
@@ -40,6 +56,24 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
         }
         return quizData
       })
+
+      if (subStatus.questionStates) {
+        setQuestionStates(subStatus.questionStates as any)
+        setAnswers((prevAnswers) => {
+          const merged = { ...prevAnswers }
+          for (const [qId, st] of Object.entries(subStatus.questionStates as any)) {
+            const state = st as any
+            if (state.previousAnswer !== null && state.previousAnswer !== undefined) {
+              if (state.status === "UNCHANGED") {
+                merged[qId] = state.previousAnswer
+              } else if (merged[qId] === undefined) {
+                merged[qId] = state.previousAnswer
+              }
+            }
+          }
+          return merged
+        })
+      }
 
       if (subStatus.isOutdated) {
         setIsOutdated(true)
@@ -97,6 +131,7 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
   }, [newQuestionNotice])
 
   const handleAnswerChange = (questionId: string, value: string) => {
+    if (questionStates[questionId]?.status === "UNCHANGED") return
     setAnswers((prev) => ({ ...prev, [questionId]: value }))
   }
 
@@ -235,32 +270,92 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
               <div className="flex flex-col gap-8 mt-2">
                 {quiz.questions?.map((q: QuizQuestion, index: number) => {
                   const options = q.options ? JSON.parse(q.options) : []
+                  const qState = questionStates[q.id]
+                  const isLocked = qState?.status === "UNCHANGED"
+                  const isModified = qState?.status === "MODIFIED"
+                  const isNew = qState?.status === "NEW"
+
                   return (
-                    <div key={q.id} className="flex flex-col gap-3 p-4 rounded-lg bg-gray-50/60 border border-gray-200/80">
-                      <div className="flex items-start gap-2">
-                        <span className="font-bold text-gray-900">{index + 1}.</span>
-                        <div className="flex-1">
-                          <p className="font-semibold text-gray-900">{q.questionText}</p>
-                          <span className="text-xs text-gray-500 mt-1 inline-block bg-white px-2 py-0.5 border border-gray-200 rounded">
-                            {q.marks} {q.marks === 1 ? "mark" : "marks"}
-                          </span>
+                    <div
+                      key={q.id}
+                      className={`flex flex-col gap-3 p-4 rounded-lg border transition-all ${
+                        isLocked
+                          ? "bg-gray-100/70 border-gray-200"
+                          : isModified
+                          ? "bg-amber-50/40 border-amber-200 shadow-sm"
+                          : "bg-gray-50/60 border-gray-200/80"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-2 flex-1">
+                          <span className="font-bold text-gray-900">{index + 1}.</span>
+                          <div className="flex-1">
+                            <p className="font-semibold text-gray-900">{q.questionText}</p>
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              <span className="text-xs text-gray-500 bg-white px-2 py-0.5 border border-gray-200 rounded">
+                                {q.marks} {q.marks === 1 ? "mark" : "marks"}
+                              </span>
+                              {isLocked && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-gray-200 text-gray-700">
+                                  <Lock size={11} className="text-gray-500" />
+                                  Answer Preserved (Locked)
+                                </span>
+                              )}
+                              {isModified && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                                  <Sparkles size={11} className="text-amber-600" />
+                                  Updated Question &mdash; Answer required
+                                </span>
+                              )}
+                              {isNew && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+                                  <Sparkles size={11} className="text-blue-600" />
+                                  New Question
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
+
+                      {isModified && qState?.previousAnswer && (
+                        <div className="ml-6 text-xs text-amber-800 bg-amber-50 p-2 rounded border border-amber-200/60">
+                          Previously submitted answer: <strong>&ldquo;{qState.previousAnswer}&rdquo;</strong> (You can update it below)
+                        </div>
+                      )}
+
+                      {isLocked && (
+                        <div className="ml-6 text-xs text-gray-500 italic">
+                          This question was not modified. Your previously submitted answer has been preserved and cannot be changed.
+                        </div>
+                      )}
 
                       <div className="ml-6">
                         {q.type === "MULTIPLE_CHOICE" && (
                           <div className="flex flex-col gap-2.5">
                             {options.map((opt: string, i: number) => (
-                              <label key={i} className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-white transition-colors">
+                              <label
+                                key={i}
+                                className={`flex items-center gap-3 p-2 rounded transition-colors ${
+                                  isLocked
+                                    ? "cursor-not-allowed opacity-85"
+                                    : "cursor-pointer hover:bg-white"
+                                }`}
+                              >
                                 <input
                                   type="radio"
                                   name={`question-${q.id}`}
                                   value={opt}
                                   checked={answers[q.id] === opt}
+                                  disabled={isLocked}
                                   onChange={(e) => handleAnswerChange(q.id, e.target.value)}
-                                  className="w-4 h-4 text-[#a17038] focus:ring-[#a17038]"
+                                  className={`w-4 h-4 text-[#a17038] focus:ring-[#a17038] ${
+                                    isLocked ? "cursor-not-allowed" : "cursor-pointer"
+                                  }`}
                                 />
-                                <span className="text-gray-800 text-sm font-medium">{opt}</span>
+                                <span className={`text-sm ${isLocked ? "text-gray-700 font-medium" : "text-gray-800 font-medium"}`}>
+                                  {opt}
+                                </span>
                               </label>
                             ))}
                           </div>
@@ -270,18 +365,30 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
                           <input
                             type="text"
                             value={answers[q.id] || ""}
+                            disabled={isLocked}
+                            readOnly={isLocked}
                             onChange={(e) => handleAnswerChange(q.id, e.target.value)}
-                            className="w-full max-w-md p-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#a17038] text-sm text-gray-900 bg-white placeholder-gray-400"
-                            placeholder="Type single word answer..."
+                            className={`w-full max-w-md p-2.5 border rounded-lg text-sm text-gray-900 ${
+                              isLocked
+                                ? "bg-gray-100/90 border-gray-300 text-gray-700 cursor-not-allowed font-medium"
+                                : "bg-white border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#a17038]"
+                            }`}
+                            placeholder={isLocked ? "Preserved answer" : "Type single word answer..."}
                           />
                         )}
 
                         {q.type === "SHORT_ANSWER" && (
                           <textarea
                             value={answers[q.id] || ""}
+                            disabled={isLocked}
+                            readOnly={isLocked}
                             onChange={(e) => handleAnswerChange(q.id, e.target.value)}
-                            className="w-full p-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#a17038] min-h-[100px] text-sm text-gray-900 bg-white placeholder-gray-400"
-                            placeholder="Type your response..."
+                            className={`w-full p-2.5 border rounded-lg min-h-[100px] text-sm text-gray-900 ${
+                              isLocked
+                                ? "bg-gray-100/90 border-gray-300 text-gray-700 cursor-not-allowed font-medium"
+                                : "bg-white border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#a17038]"
+                            }`}
+                            placeholder={isLocked ? "Preserved answer" : "Type your response..."}
                           />
                         )}
                       </div>
@@ -310,7 +417,7 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
               className="px-6 py-2 text-sm font-semibold text-white rounded-lg hover:opacity-95 shadow-sm"
               style={{ backgroundColor: "#a17038" }}
             >
-              {isSubmitting ? "Submitting..." : "Submit Answers"}
+              {isSubmitting ? "Submitting..." : isOutdated ? "Submit Updated Quiz" : "Submit Answers"}
             </button>
           </div>
         )}

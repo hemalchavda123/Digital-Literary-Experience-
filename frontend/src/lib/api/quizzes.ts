@@ -101,7 +101,20 @@ export const submitQuiz = async (
 export const getMySubmission = async (
   projectId: string,
   quizId: string
-): Promise<{ submitted: boolean; isOutdated?: boolean; submission: QuizSubmission | null }> => {
+): Promise<{
+  submitted: boolean;
+  isOutdated?: boolean;
+  submission: QuizSubmission | null;
+  questionStates?: Record<
+    string,
+    {
+      status: 'UNCHANGED' | 'MODIFIED' | 'NEW';
+      previousAnswer: string | null;
+      score: number | null;
+      isCorrect: boolean | null;
+    }
+  >;
+}> => {
   const res = await authFetch(`${API_BASE_URL}/projects/${projectId}/quizzes/${quizId}/my-submission`);
   if (!res.ok) throw new Error(await extractError(res, "Failed to fetch submission status"));
   return res.json();

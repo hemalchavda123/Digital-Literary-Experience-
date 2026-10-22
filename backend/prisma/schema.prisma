@@ -271,6 +271,8 @@ model QuizQuestion {
   marks       Int       @default(1)
   correctAnswer String? 
   isPublished Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now())
 
   quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
   answers     QuizAnswer[]
@@ -284,6 +286,7 @@ model QuizSubmission {
   userId      String
   submittedAt DateTime  @default(now())
   totalScore  Int?
+  history     Json?
 
   quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
