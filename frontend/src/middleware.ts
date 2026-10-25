@@ -15,6 +15,7 @@ export function middleware(request: NextRequest) {
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||
+    pathname.startsWith('/socket.io') ||
     pathname.includes('.') // static files like .ico, .png, etc.
   ) {
     return NextResponse.next()
@@ -47,7 +48,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization)
      * - favicon.ico
+     * - socket.io (WebSocket endpoint)
      */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|socket.io).*)',
   ],
 }

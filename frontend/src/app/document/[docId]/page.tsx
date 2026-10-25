@@ -15,7 +15,32 @@ import { getCurrentUser } from "@/lib/api/authFetch"
 import { Filter, X as CloseIcon, BarChart2 } from "lucide-react"
 import { PdfQuizAnalyticsModal } from "@/components/project/PdfQuizAnalyticsModal"
 
-const PdfViewer = dynamic(() => import("@/components/pdf/PdfViewer").then(mod => mod.PdfViewer), { ssr: false })
+const PdfViewer = dynamic(
+  () =>
+    import("@/components/pdf/PdfViewer")
+      .then((mod) => mod.PdfViewer)
+      .catch((err) => {
+        console.error("Failed to load PDF viewer chunk:", err)
+        if (typeof window !== "undefined") {
+          const reloadKey = "doc_chunk_reload_attempt"
+          const lastAttempt = sessionStorage.getItem(reloadKey)
+          if (!lastAttempt || Date.now() - Number(lastAttempt) > 15000) {
+            sessionStorage.setItem(reloadKey, String(Date.now()))
+            window.location.reload()
+          }
+        }
+        throw err
+      }),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex flex-col items-center justify-center py-24 text-gray-500 gap-3">
+        <div className="w-8 h-8 border-3 border-black border-t-transparent rounded-full animate-spin" />
+        <span className="text-sm font-medium">Loading document viewer...</span>
+      </div>
+    ),
+  }
+)
 
 export default function DocumentPage() {
   const params = useParams<{ docId: string }>()

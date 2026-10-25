@@ -39,15 +39,21 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
     const newSocket = io(baseUrl, {
       auth: token ? { token } : {},
-      transports: ['websocket', 'polling'], // ensure fallback
+      transports: ['polling', 'websocket'],
+      reconnectionAttempts: 5,
+      timeout: 10000,
     });
 
     newSocket.on('connect', () => {
       console.log('Connected to WebSocket server');
     });
 
-    newSocket.on('disconnect', () => {
-      console.log('Disconnected from WebSocket server');
+    newSocket.on('connect_error', (err) => {
+      console.warn('Socket connection error:', err.message);
+    });
+
+    newSocket.on('disconnect', (reason) => {
+      console.log('Disconnected from WebSocket server:', reason);
     });
 
     setSocket(newSocket);
