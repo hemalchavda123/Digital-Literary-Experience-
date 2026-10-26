@@ -4,6 +4,9 @@ import { submitQuiz, getQuizById, getMySubmission } from "@/lib/api/quizzes"
 import { useSocket } from "@/context/SocketContext"
 import { CheckCircle2, Award, Clock, RefreshCw, Lock, Sparkles } from "lucide-react"
 
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const getAlphabetLabel = (index: number) => ALPHABET[index] || ""
+
 interface Props {
   quiz: Quiz
   projectId: string
@@ -333,31 +336,38 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
                       <div className="ml-6">
                         {q.type === "MULTIPLE_CHOICE" && (
                           <div className="flex flex-col gap-2.5">
-                            {options.map((opt: string, i: number) => (
-                              <label
-                                key={i}
-                                className={`flex items-center gap-3 p-2 rounded transition-colors ${
-                                  isLocked
-                                    ? "cursor-not-allowed opacity-85"
-                                    : "cursor-pointer hover:bg-white"
-                                }`}
-                              >
-                                <input
-                                  type="radio"
-                                  name={`question-${q.id}`}
-                                  value={opt}
-                                  checked={answers[q.id] === opt}
+                            {options.map((opt: string, i: number) => {
+                              const letter = getAlphabetLabel(i)
+                              const isSelected = answers[q.id] === letter
+                              return (
+                                <button
+                                  key={i}
+                                  type="button"
                                   disabled={isLocked}
-                                  onChange={(e) => handleAnswerChange(q.id, e.target.value)}
-                                  className={`w-4 h-4 text-[#a17038] focus:ring-[#a17038] ${
-                                    isLocked ? "cursor-not-allowed" : "cursor-pointer"
+                                  onClick={() => handleAnswerChange(q.id, letter)}
+                                  className={`flex items-center gap-3 p-2.5 rounded-lg border transition-all text-left ${
+                                    isLocked
+                                      ? "cursor-not-allowed opacity-85 border-gray-200 bg-gray-50"
+                                      : isSelected
+                                      ? "border-[#a17038] bg-amber-50/60 shadow-sm"
+                                      : "border-gray-200 hover:border-gray-300 hover:bg-gray-50 cursor-pointer"
                                   }`}
-                                />
-                                <span className={`text-sm ${isLocked ? "text-gray-700 font-medium" : "text-gray-800 font-medium"}`}>
-                                  {opt}
-                                </span>
-                              </label>
-                            ))}
+                                >
+                                  <span
+                                    className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold flex-shrink-0 transition-colors ${
+                                      isSelected
+                                        ? "bg-[#a17038] text-white"
+                                        : "bg-gray-200 text-gray-700"
+                                    }`}
+                                  >
+                                    {letter}
+                                  </span>
+                                  <span className={`text-sm ${isLocked ? "text-gray-700 font-medium" : "text-gray-800 font-medium"}`}>
+                                    {opt}
+                                  </span>
+                                </button>
+                              )
+                            })}
                           </div>
                         )}
 

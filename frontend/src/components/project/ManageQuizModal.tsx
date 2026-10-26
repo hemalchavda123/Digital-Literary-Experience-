@@ -23,6 +23,9 @@ interface TempQuestion {
 
 let tempQuestionIdCounter = 0
 
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const getAlphabetLabel = (index: number) => ALPHABET[index] || ""
+
 export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
   const { updateQuiz, publishQuestion } = useProjects()
   const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit")
@@ -112,6 +115,7 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
     setQuestions(
       questions.map((q) => {
         if (q.id !== questionId) return q
+        if (q.options.length >= 26) return q // Limit to Z
         return { ...q, options: [...q.options, `Option ${q.options.length + 1}`] }
       })
     )
@@ -291,7 +295,9 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
                             <div className="ml-9 mt-2 flex flex-col gap-2">
                               {q.options.map((opt, optIndex) => (
                                 <div key={optIndex} className="flex items-center gap-2">
-                                  <input type="radio" disabled className="w-4 h-4" />
+                                  <span className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-700 flex-shrink-0">
+                                    {getAlphabetLabel(optIndex)}
+                                  </span>
                                   <input
                                     type="text"
                                     value={opt}
@@ -305,20 +311,40 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
                                   )}
                                 </div>
                               ))}
-                              <button onClick={() => addOption(q.id)} className="text-xs text-[#a17038] hover:underline self-start mt-1">
-                                + Add Option
-                              </button>
+                              {q.options.length < 26 && (
+                                <button onClick={() => addOption(q.id)} className="text-xs text-[#a17038] hover:underline self-start mt-1">
+                                  + Add Option ({q.options.length}/26)
+                                </button>
+                              )}
                             </div>
                           )}
 
                           <div className="ml-9 mt-2">
-                            <input
-                              type="text"
-                              value={q.correctAnswer}
-                              onChange={(e) => updateQuestion(q.id, "correctAnswer", e.target.value)}
-                              placeholder="Correct Answer (optional, for auto-grading)"
-                              className="w-full p-2 border border-gray-200 rounded focus:outline-none text-sm bg-white text-gray-900 placeholder-gray-500"
-                            />
+                            {q.type === "MULTIPLE_CHOICE" ? (
+                              <div className="flex items-center gap-2">
+                                <label className="text-xs font-medium text-gray-600">Correct Answer:</label>
+                                <select
+                                  value={q.correctAnswer}
+                                  onChange={(e) => updateQuestion(q.id, "correctAnswer", e.target.value)}
+                                  className="p-2 border border-gray-200 rounded focus:outline-none text-sm bg-white text-gray-900"
+                                >
+                                  <option value="">-- Select correct option --</option>
+                                  {q.options.map((_, optIndex) => (
+                                    <option key={optIndex} value={getAlphabetLabel(optIndex)}>
+                                      {getAlphabetLabel(optIndex)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            ) : (
+                              <input
+                                type="text"
+                                value={q.correctAnswer}
+                                onChange={(e) => updateQuestion(q.id, "correctAnswer", e.target.value)}
+                                placeholder="Correct Answer (optional, for auto-grading)"
+                                className="w-full p-2 border border-gray-200 rounded focus:outline-none text-sm bg-white text-gray-900 placeholder-gray-500"
+                              />
+                            )}
                           </div>
                         </div>
                       </div>
@@ -363,11 +389,9 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
                           <div className="flex flex-col gap-2">
                             {q.options.map((opt, i) => (
                               <label key={i} className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  disabled
-                                  className="w-4 h-4 text-[#a17038] focus:ring-[#a17038]"
-                                />
+                                <span className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600 flex-shrink-0">
+                                  {getAlphabetLabel(i)}
+                                </span>
                                 <span className="text-gray-700 text-sm">{opt || `Option ${i + 1}`}</span>
                               </label>
                             ))}
