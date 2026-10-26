@@ -22,7 +22,7 @@ function sortProjects(projects: ReturnType<typeof useProjects>["projects"], filt
 
 export default function HomePage() {
   const router = useRouter()
-  const { projects, loading, refreshProjects } = useProjects()
+  const { projects, loading, refreshProjects, renameProject, deleteProject } = useProjects()
   const [searchQuery, setSearchQuery] = useState("")
   const [filter, setFilter] = useState<string>("all")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -152,7 +152,7 @@ export default function HomePage() {
               </button>
             </div>
 
-            <ProjectGrid projects={filtered} />
+            <ProjectGrid projects={filtered} onRename={renameProject} onDelete={deleteProject} currentUserId={currentUser?.id} />
           </div>
         </div>
       </main>
