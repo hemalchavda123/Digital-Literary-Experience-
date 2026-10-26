@@ -325,6 +325,14 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
                     ))}
                   </div>
                 )}
+                {questions.length > 0 && (
+                  <button
+                    onClick={handleAddQuestion}
+                    className="w-full py-3 text-sm border-2 border-dashed border-gray-300 rounded-md font-medium text-gray-500 hover:border-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors mt-2"
+                  >
+                    + Add Question
+                  </button>
+                )}
               </div>
             </>
           ) : (

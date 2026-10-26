@@ -172,7 +172,7 @@ export function CreateQuizModal({ projectId, documentId, annotationId, onClose }
                 <p className="text-sm text-gray-500">No questions added yet.</p>
               </div>
             ) : (
-              questions.map((q, index) => (
+              <>{questions.map((q, index) => (
                 <div key={q.id} className="border border-gray-200 rounded-md p-4 bg-gray-50 relative group">
                   <div className="absolute top-4 right-12 flex items-center gap-2">
                     <label className="flex items-center cursor-pointer gap-2">
@@ -258,7 +258,15 @@ export function CreateQuizModal({ projectId, documentId, annotationId, onClose }
                     </div>
                   </div>
                 </div>
-              ))
+              ))}</>
+            )}
+            {questions.length > 0 && (
+              <button
+                onClick={handleAddQuestion}
+                className="w-full py-3 text-sm border-2 border-dashed border-gray-300 rounded-md font-medium text-gray-500 hover:border-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                + Add Question
+              </button>
             )}
           </div>
         </div>
