@@ -57,8 +57,9 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
     const newSocket = io(baseUrl, {
       auth: token ? { token } : {},
+      withCredentials: true,
       transports: ['polling', 'websocket'],
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
       timeout: 10000,
     });
 

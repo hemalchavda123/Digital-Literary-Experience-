@@ -424,11 +424,11 @@ export const submitQuiz = async (req: Request, res: Response, next: NextFunction
       if (isUnchanged && prevAns) {
         // Strictly preserve previously submitted answer for unchanged questions
         answerText = prevAns.answerText;
-      } else if (incomingAnswersMap.has(question.id)) {
-        // For new or modified questions, accept the incoming answer
-        answerText = incomingAnswersMap.get(question.id) || '';
+      } else if (incomingAnswersMap.has(question.id) && (incomingAnswersMap.get(question.id) || '').trim() !== '') {
+        // For new or modified questions, accept the incoming answer if non-empty
+        answerText = incomingAnswersMap.get(question.id)!.trim();
       } else {
-        // Question was not answered in incoming payload and has no previous answer - do not create a fake blank answer row
+        // Question was not answered in incoming payload or left blank - do not create a fake blank answer row
         continue;
       }
 

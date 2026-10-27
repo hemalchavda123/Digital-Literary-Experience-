@@ -27,7 +27,10 @@ export const getQuizzes = async (
 };
 
 export const getQuizById = async (projectId: string, quizId: string): Promise<Quiz> => {
-  const res = await authFetch(`${API_BASE_URL}/projects/${projectId}/quizzes/${quizId}`);
+  const res = await authFetch(`${API_BASE_URL}/projects/${projectId}/quizzes/${quizId}?_t=${Date.now()}`, {
+    cache: 'no-store',
+    headers: { 'Cache-Control': 'no-cache' },
+  });
   if (!res.ok) throw new Error(await extractError(res, "Failed to fetch quiz"));
   return res.json();
 };
@@ -115,7 +118,10 @@ export const getMySubmission = async (
     }
   >;
 }> => {
-  const res = await authFetch(`${API_BASE_URL}/projects/${projectId}/quizzes/${quizId}/my-submission`);
+  const res = await authFetch(`${API_BASE_URL}/projects/${projectId}/quizzes/${quizId}/my-submission?_t=${Date.now()}`, {
+    cache: 'no-store',
+    headers: { 'Cache-Control': 'no-cache' },
+  });
   if (!res.ok) throw new Error(await extractError(res, "Failed to fetch submission status"));
   return res.json();
 };

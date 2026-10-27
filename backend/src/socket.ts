@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 let io: Server;
 
 export const initSocket = (server: HttpServer) => {
-  const allowedOrigins = (process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000,https://exegesis.dau.ac.in')
+  const allowedOrigins = (process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000,http://127.0.0.1:3000,https://exegesis.dau.ac.in')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
@@ -15,6 +15,9 @@ export const initSocket = (server: HttpServer) => {
       origin: (origin: string | undefined, cb: (err: Error | null, success?: boolean) => void) => {
         if (!origin) return cb(null, true);
         if (allowedOrigins.includes(origin)) return cb(null, true);
+        if (process.env.NODE_ENV !== 'production' && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+          return cb(null, true);
+        }
         if (origin.includes('exegesis.dau.ac.in') || origin.endsWith('.dau.ac.in')) return cb(null, true);
         if (origin.match(/^https:\/\/digital-literary-experience.*\.vercel\.app$/)) return cb(null, true);
         return cb(new Error('Not allowed by CORS'));

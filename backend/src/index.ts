@@ -57,7 +57,7 @@ const authLimiter = rateLimit({
 
 app.use(limiter);
 
-const allowedOrigins = (process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000,https://exegesis.dau.ac.in')
+const allowedOrigins = (process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000,http://127.0.0.1:3000,https://exegesis.dau.ac.in')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean);
@@ -68,6 +68,9 @@ app.use(
       // Allow non-browser or same-origin requests (no Origin header)
       if (!origin) return cb(null, true);
       if (allowedOrigins.includes(origin)) return cb(null, true);
+      if (process.env.NODE_ENV !== 'production' && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+        return cb(null, true);
+      }
       if (origin.includes('exegesis.dau.ac.in') || origin.endsWith('.dau.ac.in')) return cb(null, true);
       // Also allow Vercel preview deployment URLs for this project (strict match)
       if (origin.match(/^https:\/\/digital-literary-experience(-[a-zA-Z0-9-]+)?\.vercel\.app$/)) return cb(null, true);

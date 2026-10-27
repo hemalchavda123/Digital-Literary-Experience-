@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import type { Quiz, QuizQuestion } from "@/types/quiz"
 import { submitQuiz, getQuizById, getMySubmission } from "@/lib/api/quizzes"
 import { useSocket } from "@/context/SocketContext"
@@ -23,6 +23,7 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
   const [pastSubmission, setPastSubmission] = useState<any>(null)
   const [showPastScore, setShowPastScore] = useState(false)
   const [newQuestionNotice, setNewQuestionNotice] = useState<string | null>(null)
+  const prevQuestionCountRef = useRef<number>(0)
   const [questionStates, setQuestionStates] = useState<
     Record<
       string,
@@ -49,18 +50,16 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
         })),
       ])
 
-      setQuiz((prevQuiz) => {
-        if (showNotice && prevQuiz?.questions && quizData?.questions) {
-          const prevCount = prevQuiz.questions.length
-          const newCount = quizData.questions.length
-          if (newCount > prevCount) {
-            setTimeout(() => {
-              setNewQuestionNotice(`A new question has been published (${newCount - prevCount} new question${newCount - prevCount > 1 ? "s" : ""} added)!`)
-            }, 0)
-          }
+      if (quizData?.questions) {
+        const newCount = quizData.questions.length
+        if (showNotice && prevQuestionCountRef.current > 0 && newCount > prevQuestionCountRef.current) {
+          const diff = newCount - prevQuestionCountRef.current
+          setNewQuestionNotice(`A new question has been published (${diff} new question${diff > 1 ? "s" : ""} added)!`)
         }
-        return quizData
-      })
+        prevQuestionCountRef.current = newCount
+      }
+
+      setQuiz(quizData)
 
       if (subStatus.questionStates) {
         setQuestionStates(subStatus.questionStates as any)
@@ -112,29 +111,51 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
     }
   }, [projectId, joinProject])
 
+  // Sync when parent passes an updated quiz prop
+  useEffect(() => {
+    if (initialQuiz) {
+      refreshQuizData(true)
+    }
+  }, [initialQuiz?.updatedAt, initialQuiz?.questions?.length, refreshQuizData])
+
+  // Real-time synchronization via WebSockets
   useEffect(() => {
     if (!socket) return
 
-    const handleQuizUpdated = (data: { quizId: string; projectId: string }) => {
-      if (data.quizId === initialQuiz.id || (quiz && data.quizId === quiz.id)) {
-        refreshQuizData(true)
-      }
-    }
-
-    const handleQuestionPublished = (data: { quizId: string; projectId: string }) => {
-      if (data.quizId === initialQuiz.id || (quiz && data.quizId === quiz.id)) {
+    const handleQuizUpdated = (data: any) => {
+      const targetQuizId = data?.quizId || data?.id || data?.quiz?.id
+      if (!targetQuizId || targetQuizId === initialQuiz.id || (quiz && targetQuizId === quiz.id)) {
         refreshQuizData(true)
       }
     }
 
     socket.on("quiz_updated", handleQuizUpdated)
-    socket.on("question_published", handleQuestionPublished)
+    socket.on("question_published", handleQuizUpdated)
+    socket.on("quiz_created", handleQuizUpdated)
 
     return () => {
       socket.off("quiz_updated", handleQuizUpdated)
-      socket.off("question_published", handleQuestionPublished)
+      socket.off("question_published", handleQuizUpdated)
+      socket.off("quiz_created", handleQuizUpdated)
     }
   }, [socket, initialQuiz.id, quiz?.id, refreshQuizData])
+
+  // Resilient live polling and window focus synchronization while modal is open
+  useEffect(() => {
+    const handleFocus = () => {
+      refreshQuizData(true)
+    }
+    window.addEventListener("focus", handleFocus)
+
+    const interval = setInterval(() => {
+      refreshQuizData(true)
+    }, 3000)
+
+    return () => {
+      window.removeEventListener("focus", handleFocus)
+      clearInterval(interval)
+    }
+  }, [refreshQuizData])
 
   useEffect(() => {
     if (newQuestionNotice) {
