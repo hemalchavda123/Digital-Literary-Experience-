@@ -54,7 +54,9 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
           const prevCount = prevQuiz.questions.length
           const newCount = quizData.questions.length
           if (newCount > prevCount) {
-            setNewQuestionNotice(`A new question has been published (${newCount - prevCount} new question${newCount - prevCount > 1 ? "s" : ""} added)!`)
+            setTimeout(() => {
+              setNewQuestionNotice(`A new question has been published (${newCount - prevCount} new question${newCount - prevCount > 1 ? "s" : ""} added)!`)
+            }, 0)
           }
         }
         return quizData
@@ -106,13 +108,13 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
     if (!socket) return
 
     const handleQuizUpdated = (data: { quizId: string; projectId: string }) => {
-      if (data.quizId === initialQuiz.id) {
+      if (data.quizId === initialQuiz.id || (quiz && data.quizId === quiz.id)) {
         refreshQuizData(true)
       }
     }
 
     const handleQuestionPublished = (data: { quizId: string; projectId: string }) => {
-      if (data.quizId === initialQuiz.id) {
+      if (data.quizId === initialQuiz.id || (quiz && data.quizId === quiz.id)) {
         refreshQuizData(true)
       }
     }
@@ -124,7 +126,7 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
       socket.off("quiz_updated", handleQuizUpdated)
       socket.off("question_published", handleQuestionPublished)
     }
-  }, [socket, initialQuiz.id, refreshQuizData])
+  }, [socket, initialQuiz.id, quiz?.id, refreshQuizData])
 
   useEffect(() => {
     if (newQuestionNotice) {

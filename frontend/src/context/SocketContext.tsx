@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 
 interface SocketContextValue {
@@ -21,6 +21,24 @@ export function useSocket() {
 
 export function SocketProvider({ children }: { children: React.ReactNode }) {
   const [socket, setSocket] = useState<Socket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const joinedProjectsRef = useRef<Set<string>>(new Set());
+
+  const joinProject = useCallback((projectId: string) => {
+    if (!projectId) return;
+    joinedProjectsRef.current.add(projectId);
+    if (socketRef.current) {
+      socketRef.current.emit('join_project', projectId);
+    }
+  }, []);
+
+  const leaveProject = useCallback((projectId: string) => {
+    if (!projectId) return;
+    joinedProjectsRef.current.delete(projectId);
+    if (socketRef.current) {
+      socketRef.current.emit('leave_project', projectId);
+    }
+  }, []);
 
   useEffect(() => {
     // Only connect if we are in the browser
@@ -44,8 +62,14 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       timeout: 10000,
     });
 
+    socketRef.current = newSocket;
+
     newSocket.on('connect', () => {
-      console.log('Connected to WebSocket server');
+      console.log('Connected to WebSocket server:', newSocket.id);
+      // Re-join all active projects whenever connected or reconnected
+      joinedProjectsRef.current.forEach((projectId) => {
+        newSocket.emit('join_project', projectId);
+      });
     });
 
     newSocket.on('connect_error', (err) => {
@@ -58,22 +82,16 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
     setSocket(newSocket);
 
+    // Also emit for any projects already added before connect event fired
+    joinedProjectsRef.current.forEach((projectId) => {
+      newSocket.emit('join_project', projectId);
+    });
+
     return () => {
       newSocket.disconnect();
+      socketRef.current = null;
     };
   }, []);
-
-  const joinProject = (projectId: string) => {
-    if (socket) {
-      socket.emit('join_project', projectId);
-    }
-  };
-
-  const leaveProject = (projectId: string) => {
-    if (socket) {
-      socket.emit('leave_project', projectId);
-    }
-  };
 
   return (
     <SocketContext.Provider value={{ socket, joinProject, leaveProject }}>

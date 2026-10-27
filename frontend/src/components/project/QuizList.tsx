@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useProjects } from "@/context/ProjectContext"
+import { useSocket } from "@/context/SocketContext"
 import type { Quiz } from "@/types/quiz"
 import { CreateQuizModal } from "./CreateQuizModal"
 import { QuizTakeModal } from "./QuizTakeModal"
@@ -172,8 +173,15 @@ interface Props {
 
 export function QuizList({ projectId, isOwner, currentUserId }: Props) {
   const { quizzesForProject } = useProjects()
+  const { joinProject } = useSocket()
   const quizzes = quizzesForProject(projectId)
   const [createModalOpen, setCreateModalOpen] = useState(false)
+
+  useEffect(() => {
+    if (projectId) {
+      joinProject(projectId)
+    }
+  }, [projectId, joinProject])
 
   return (
     <div className="flex flex-col gap-6 mt-4">

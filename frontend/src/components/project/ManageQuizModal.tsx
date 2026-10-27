@@ -41,31 +41,49 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hasLoadedRef = useRef(false)
-  const isFirstRenderAfterLoad = useRef(true)
+  const lastSavedSnapshotRef = useRef<string>("")
+
+  const getSnapshot = (t: string, d: string, s: string, qs: TempQuestion[]) => {
+    return JSON.stringify({
+      title: t.trim(),
+      description: d.trim(),
+      status: s,
+      questions: qs.map((q) => ({
+        id: typeof q.id === "string" && !q.id.startsWith("temp-") ? q.id : null,
+        type: q.type,
+        questionText: q.questionText,
+        options: q.options,
+        marks: q.marks,
+        correctAnswer: q.correctAnswer,
+        isPublished: q.isPublished,
+      })),
+    })
+  }
 
   useEffect(() => {
     getQuizById(projectId, quizId)
       .then((data) => {
+        const loadedQuestions = (data.questions || []).map((q) => ({
+          id: q.id,
+          type: q.type,
+          questionText: q.questionText,
+          options: q.options ? JSON.parse(q.options) : [],
+          marks: q.marks,
+          correctAnswer: q.correctAnswer || "",
+          isPublished: q.isPublished,
+        }))
         setTitle(data.title)
         setDescription(data.description || "")
         setStatus(data.status as "DRAFT" | "PUBLISHED")
-        setQuestions(
-          (data.questions || []).map((q) => ({
-            id: q.id,
-            type: q.type,
-            questionText: q.questionText,
-            options: q.options ? JSON.parse(q.options) : [],
-            marks: q.marks,
-            correctAnswer: q.correctAnswer || "",
-            isPublished: q.isPublished,
-          }))
+        setQuestions(loadedQuestions)
+        lastSavedSnapshotRef.current = getSnapshot(
+          data.title,
+          data.description || "",
+          data.status as "DRAFT" | "PUBLISHED",
+          loadedQuestions
         )
         setLoading(false)
-        // Mark that initial data has loaded; the next state change is user-driven
-        setTimeout(() => {
-          hasLoadedRef.current = true
-          isFirstRenderAfterLoad.current = true
-        }, 0)
+        hasLoadedRef.current = true
       })
       .catch((err) => {
         console.error("Failed to load quiz", err)
@@ -79,7 +97,7 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
 
     setAutoSaveStatus("saving")
     try {
-      await updateQuiz(projectId, quizId, {
+      const updatedQuiz = await updateQuiz(projectId, quizId, {
         title: title.trim(),
         description: description.trim(),
         status,
@@ -94,6 +112,22 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
         })),
       })
       setAutoSaveStatus("saved")
+
+      if (updatedQuiz && Array.isArray(updatedQuiz.questions)) {
+        // Map backend-assigned IDs to any temp- questions so subsequent updates preserve them
+        setQuestions((current) => {
+          const updatedList = current.map((q, idx) => {
+            if (typeof q.id === "string" && q.id.startsWith("temp-") && updatedQuiz.questions[idx]) {
+              return { ...q, id: updatedQuiz.questions[idx].id }
+            }
+            return q
+          })
+          lastSavedSnapshotRef.current = getSnapshot(title, description, status, updatedList)
+          return updatedList
+        })
+      } else {
+        lastSavedSnapshotRef.current = getSnapshot(title, description, status, questions)
+      }
     } catch (error) {
       console.error("Auto-save failed", error)
       setAutoSaveStatus("error")
@@ -103,21 +137,20 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
   useEffect(() => {
     if (!hasLoadedRef.current) return
 
-    // Skip the first render cycle after load to avoid saving the initial state
-    if (isFirstRenderAfterLoad.current) {
-      isFirstRenderAfterLoad.current = false
+    const currentSnapshot = getSnapshot(title, description, status, questions)
+    if (currentSnapshot === lastSavedSnapshotRef.current) {
       return
     }
 
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
       performAutoSave()
-    }, 1500)
+    }, 1200)
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [title, description, questions, performAutoSave])
+  }, [title, description, status, questions, performAutoSave])
 
   const handleAddQuestion = () => {
     setQuestions([
