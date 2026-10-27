@@ -107,6 +107,8 @@ export const getMySubmission = async (
 ): Promise<{
   submitted: boolean;
   isOutdated?: boolean;
+  isClosed?: boolean;
+  totalMarks?: number;
   submission: QuizSubmission | null;
   questionStates?: Record<
     string,

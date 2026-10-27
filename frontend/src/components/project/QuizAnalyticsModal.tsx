@@ -279,7 +279,11 @@ export function QuizAnalyticsModal({ projectId, quizId, quizTitle, onClose }: Pr
                   Question Responses Analytics
                 </span>
                 {analytics?.status && (
-                  <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${analytics.status === 'PUBLISHED' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700'}`}>
+                  <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
+                    analytics.status === 'PUBLISHED' ? 'bg-green-100 text-green-700' :
+                    analytics.status === 'CLOSED' ? 'bg-rose-100 text-rose-700' :
+                    'bg-gray-200 text-gray-700'
+                  }`}>
                     {analytics.status}
                   </span>
                 )}

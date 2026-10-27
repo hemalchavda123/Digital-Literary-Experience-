@@ -33,7 +33,7 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
   
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
-  const [status, setStatus] = useState<"DRAFT" | "PUBLISHED">("DRAFT")
+  const [status, setStatus] = useState<"DRAFT" | "PUBLISHED" | "CLOSED">("DRAFT")
   const [questions, setQuestions] = useState<TempQuestion[]>([])
   
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -74,12 +74,12 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
         }))
         setTitle(data.title)
         setDescription(data.description || "")
-        setStatus(data.status as "DRAFT" | "PUBLISHED")
+        setStatus(data.status as "DRAFT" | "PUBLISHED" | "CLOSED")
         setQuestions(loadedQuestions)
         lastSavedSnapshotRef.current = getSnapshot(
           data.title,
           data.description || "",
-          data.status as "DRAFT" | "PUBLISHED",
+          data.status as "DRAFT" | "PUBLISHED" | "CLOSED",
           loadedQuestions
         )
         setLoading(false)
@@ -220,7 +220,7 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
     )
   }
 
-  const handleSave = async (newStatus?: "DRAFT" | "PUBLISHED") => {
+  const handleSave = async (newStatus?: "DRAFT" | "PUBLISHED" | "CLOSED") => {
     if (!title.trim()) {
       alert("Title is required.")
       return
@@ -267,8 +267,12 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-bold text-gray-900">Manage Quiz</h2>
-              <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${status === 'PUBLISHED' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700'}`}>
-                {status === 'PUBLISHED' ? 'Published' : 'Draft'}
+              <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
+                status === 'PUBLISHED' ? 'bg-green-100 text-green-700' :
+                status === 'CLOSED' ? 'bg-rose-100 text-rose-700' :
+                'bg-gray-200 text-gray-700'
+              }`}>
+                {status === 'PUBLISHED' ? 'Published' : status === 'CLOSED' ? 'Closed' : 'Draft'}
               </span>
             </div>
             {autoSaveStatus !== "idle" && (
@@ -331,6 +335,38 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
             <>
               {/* Quiz Details */}
               <div className="flex flex-col gap-4 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-gray-100">
+                  <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Quiz Status:</span>
+                  <div className="flex items-center bg-gray-100 p-1 rounded-lg border border-gray-200 text-xs gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setStatus("DRAFT")}
+                      className={`px-3 py-1 rounded font-semibold transition-all ${
+                        status === "DRAFT" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      Draft
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStatus("PUBLISHED")}
+                      className={`px-3 py-1 rounded font-semibold transition-all ${
+                        status === "PUBLISHED" ? "bg-emerald-600 text-white shadow-sm" : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      Published
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStatus("CLOSED")}
+                      className={`px-3 py-1 rounded font-semibold transition-all ${
+                        status === "CLOSED" ? "bg-rose-600 text-white shadow-sm" : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      Closed (Marks Only)
+                    </button>
+                  </div>
+                </div>
                 <input
                   type="text"
                   value={title}
@@ -548,31 +584,64 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="p-5 border-t border-gray-200 flex justify-end gap-3 bg-white">
-          <button
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="px-4 py-2 font-medium text-gray-700 hover:text-black"
-          >
-            Cancel
-          </button>
-          {status === 'DRAFT' && (
+        <div className="p-5 border-t border-gray-200 flex justify-between items-center bg-white flex-wrap gap-3">
+          <div className="text-xs text-gray-500">
+            {status === 'CLOSED' ? (
+              <span className="text-rose-600 font-medium flex items-center gap-1">
+                🔒 Quiz is closed. Other users can only view their total marks.
+              </span>
+            ) : status === 'PUBLISHED' ? (
+              <span className="text-emerald-700 font-medium">
+                ✓ Quiz is published and active.
+              </span>
+            ) : (
+              <span>Draft quiz. Not yet visible to students.</span>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => handleSave("PUBLISHED")}
+              onClick={onClose}
               disabled={isSubmitting}
-              className="px-5 py-2 font-medium text-white rounded bg-emerald-600 hover:bg-emerald-700 shadow-sm transition-colors text-sm"
+              className="px-4 py-2 font-medium text-gray-700 hover:text-black"
             >
-              Publish Quiz
+              Cancel
             </button>
-          )}
-          <button
-            onClick={() => handleSave()}
-            disabled={isSubmitting}
-            className="px-6 py-2 font-medium text-white rounded hover:opacity-95 shadow-sm transition-colors"
-            style={{ backgroundColor: "#a17038" }}
-          >
-            {isSubmitting ? "Saving..." : "Save Changes"}
-          </button>
+            {status === 'DRAFT' && (
+              <button
+                onClick={() => handleSave("PUBLISHED")}
+                disabled={isSubmitting}
+                className="px-5 py-2 font-medium text-white rounded bg-emerald-600 hover:bg-emerald-700 shadow-sm transition-colors text-sm"
+              >
+                Publish Quiz
+              </button>
+            )}
+            {status === 'PUBLISHED' && (
+              <button
+                onClick={() => handleSave("CLOSED")}
+                disabled={isSubmitting}
+                className="px-5 py-2 font-medium text-white rounded bg-rose-600 hover:bg-rose-700 shadow-sm transition-colors text-sm flex items-center gap-1.5"
+              >
+                Close Quiz
+              </button>
+            )}
+            {status === 'CLOSED' && (
+              <button
+                onClick={() => handleSave("PUBLISHED")}
+                disabled={isSubmitting}
+                className="px-5 py-2 font-medium text-white rounded bg-emerald-600 hover:bg-emerald-700 shadow-sm transition-colors text-sm flex items-center gap-1.5"
+              >
+                Reopen Quiz
+              </button>
+            )}
+            <button
+              onClick={() => handleSave()}
+              disabled={isSubmitting}
+              className="px-6 py-2 font-medium text-white rounded hover:opacity-95 shadow-sm transition-colors"
+              style={{ backgroundColor: "#a17038" }}
+            >
+              {isSubmitting ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

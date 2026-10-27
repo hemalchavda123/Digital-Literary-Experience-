@@ -31,17 +31,32 @@ export const getQuizzes = async (req: Request, res: Response, next: NextFunction
         projectId,
         ...(documentId ? { documentId } : {}),
         ...(annotationId ? { annotationId } : {}),
-        ...(isOwner ? {} : { status: 'PUBLISHED' }),
+        ...(isOwner ? {} : { status: { in: ['PUBLISHED', 'CLOSED'] } }),
       },
       include: {
         _count: {
           select: { questions: true, submissions: true },
         },
+        questions: {
+          select: { marks: true, isPublished: true },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    res.json(quizzes);
+    const mappedQuizzes = quizzes.map((quiz) => {
+      const activeQuestions = isOwner
+        ? quiz.questions
+        : quiz.questions.filter((q) => q.isPublished);
+      const totalMarks = activeQuestions.reduce((sum, q) => sum + (q.marks || 0), 0);
+      const { questions, ...rest } = quiz;
+      return {
+        ...rest,
+        totalMarks,
+      };
+    });
+
+    res.json(mappedQuizzes);
   } catch (error) {
     next(error);
   }
@@ -62,7 +77,7 @@ export const getQuizById = async (req: Request, res: Response, next: NextFunctio
       where: {
         id: quizId,
         projectId,
-        ...(isOwner ? {} : { status: 'PUBLISHED' }),
+        ...(isOwner ? {} : { status: { in: ['PUBLISHED', 'CLOSED'] } }),
       },
       include: {
         questions: {
@@ -76,8 +91,15 @@ export const getQuizById = async (req: Request, res: Response, next: NextFunctio
       return res.status(404).json({ message: 'Quiz not found' });
     }
 
-    // SECURITY FIX: Hide correctAnswer from non-owners to prevent data leakage
-    if (!isOwner) {
+    const totalMarks = quiz.questions.reduce((sum, q) => sum + (q.marks || 0), 0);
+    (quiz as any).totalMarks = totalMarks;
+
+    // If quiz is closed and user is not owner: hide all questions
+    // "other users can't access the question, make it so that it'll show total marks only"
+    if (!isOwner && quiz.status === 'CLOSED') {
+      quiz.questions = [];
+    } else if (!isOwner) {
+      // SECURITY FIX: Hide correctAnswer from non-owners to prevent data leakage
       quiz.questions = quiz.questions.map((q) => ({
         ...q,
         correctAnswer: null,
@@ -260,6 +282,9 @@ export const updateQuiz = async (req: Request, res: Response, next: NextFunction
       }
     }
 
+    const totalMarks = updatedQuiz.questions.reduce((sum, q) => sum + (q.marks || 0), 0);
+    (updatedQuiz as any).totalMarks = totalMarks;
+
     try {
       getIo().to(`project:${projectId}`).emit('quiz_updated', {
         projectId,
@@ -389,8 +414,16 @@ export const submitQuiz = async (req: Request, res: Response, next: NextFunction
       },
     });
 
-    if (!quiz || quiz.status !== 'PUBLISHED' || quiz.projectId !== projectId) {
-      return res.status(404).json({ message: 'Quiz not found or not published' });
+    if (!quiz || quiz.projectId !== projectId) {
+      return res.status(404).json({ message: 'Quiz not found' });
+    }
+
+    if (quiz.status === 'CLOSED') {
+      return res.status(403).json({ message: 'This quiz has been closed by the creator and is no longer accepting submissions' });
+    }
+
+    if (quiz.status !== 'PUBLISHED') {
+      return res.status(400).json({ message: 'Quiz is not published' });
     }
 
     // CHECK FOR EXISTING SUBMISSION
@@ -516,7 +549,7 @@ export const getMySubmission = async (req: Request, res: Response, next: NextFun
     const quizId = req.params.quizId as string;
     const userId = (req as any).user?.userId;
 
-    const { isMember } = await checkProjectAccess(projectId, userId);
+    const { isOwner, isMember } = await checkProjectAccess(projectId, userId);
     if (!isMember) {
       return res.status(403).json({ message: 'Access denied to this project' });
     }
@@ -525,11 +558,17 @@ export const getMySubmission = async (req: Request, res: Response, next: NextFun
       where: { id: quizId },
       include: {
         questions: {
-          where: { isPublished: true },
+          where: isOwner ? undefined : { isPublished: true },
           orderBy: { order: 'asc' },
         },
       },
     });
+
+    if (!quiz) {
+      return res.status(404).json({ message: 'Quiz not found' });
+    }
+
+    const totalMarks = quiz.questions.reduce((sum, q) => sum + (q.marks || 0), 0);
 
     const submission = await prisma.quizSubmission.findUnique({
       where: { quizId_userId: { quizId, userId } },
@@ -537,6 +576,34 @@ export const getMySubmission = async (req: Request, res: Response, next: NextFun
         answers: true,
       },
     });
+
+    // If quiz is closed and user is not owner: show total marks only, completely strip questions and answers
+    if (!isOwner && quiz.status === 'CLOSED') {
+      let totalScore: number | null = null;
+      if (submission) {
+        const validQuestionIds = new Set(quiz.questions.map((q) => q.id));
+        const validAnswers = submission.answers.filter((a) => validQuestionIds.has(a.questionId));
+        totalScore = validAnswers.reduce((sum, a) => sum + (a.score || 0), 0);
+      }
+
+      return res.json({
+        submitted: !!submission,
+        isOutdated: false,
+        isClosed: true,
+        totalMarks,
+        submission: submission
+          ? {
+              id: submission.id,
+              quizId: submission.quizId,
+              userId: submission.userId,
+              submittedAt: submission.submittedAt,
+              totalScore,
+              answers: [], // Zero questions/answers exposed
+            }
+          : null,
+        questionStates: {},
+      });
+    }
 
     const questionStates: Record<
       string,
@@ -601,6 +668,8 @@ export const getMySubmission = async (req: Request, res: Response, next: NextFun
     res.json({
       submitted: !!submission && !isOutdated,
       isOutdated,
+      isClosed: quiz.status === 'CLOSED',
+      totalMarks,
       submission,
       questionStates,
     });

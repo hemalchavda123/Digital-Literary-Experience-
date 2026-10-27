@@ -16,11 +16,13 @@ import { useRouter } from "next/navigation"
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-500",
   PUBLISHED: "bg-green-100 text-green-700",
+  CLOSED: "bg-rose-100 text-rose-700 border border-rose-200",
 }
 
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: "Draft",
   PUBLISHED: "Published",
+  CLOSED: "Closed",
 }
 
 function formatDate(dateStr: string | null) {
@@ -47,6 +49,26 @@ function QuizItem({
 
   const handlePublish = async () => {
     if (window.confirm(`Publish quiz "${quiz.title}"? Project members will be able to take it.`)) {
+      await updateQuiz(projectId, quiz.id, {
+        title: quiz.title,
+        description: quiz.description,
+        status: "PUBLISHED"
+      })
+    }
+  }
+
+  const handleClose = async () => {
+    if (window.confirm(`Close quiz "${quiz.title}"? Other users will not be able to access the questions, and will only see their total marks.`)) {
+      await updateQuiz(projectId, quiz.id, {
+        title: quiz.title,
+        description: quiz.description,
+        status: "CLOSED"
+      })
+    }
+  }
+
+  const handleReopen = async () => {
+    if (window.confirm(`Reopen quiz "${quiz.title}"? Project members will be able to access the questions and submit answers.`)) {
       await updateQuiz(projectId, quiz.id, {
         title: quiz.title,
         description: quiz.description,
@@ -82,6 +104,9 @@ function QuizItem({
         </div>
         <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
           <span>Created {formatDate(quiz.createdAt)}</span>
+          {quiz.totalMarks !== undefined && (
+            <span>{quiz.totalMarks} {quiz.totalMarks === 1 ? 'mark' : 'marks'}</span>
+          )}
           {quiz._count?.questions !== undefined && (
             <span>{quiz._count.questions} question{quiz._count.questions !== 1 ? 's' : ''}</span>
           )}
@@ -108,6 +133,22 @@ function QuizItem({
                 Publish Quiz
               </button>
             )}
+            {quiz.status === 'PUBLISHED' && (
+              <button
+                onClick={handleClose}
+                className="text-xs font-semibold text-rose-600 hover:text-rose-800 transition-colors"
+              >
+                Close Quiz
+              </button>
+            )}
+            {quiz.status === 'CLOSED' && (
+              <button
+                onClick={handleReopen}
+                className="text-xs font-semibold text-emerald-600 hover:text-emerald-800 transition-colors"
+              >
+                Reopen Quiz
+              </button>
+            )}
             <button
               onClick={() => setManageModalOpen(true)}
               className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors"
@@ -129,12 +170,21 @@ function QuizItem({
             </button>
           </>
         ) : (
-          <button
-            onClick={() => setTakeModalOpen(true)}
-            className="text-xs font-semibold text-[#a17038] hover:text-[#8a5f2e] transition-colors"
-          >
-            Take Quiz
-          </button>
+          quiz.status === 'CLOSED' ? (
+            <button
+              onClick={() => setTakeModalOpen(true)}
+              className="text-xs font-semibold text-gray-700 hover:text-black transition-colors bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded flex items-center gap-1.5"
+            >
+              <span>🔒</span> View Result (Closed)
+            </button>
+          ) : (
+            <button
+              onClick={() => setTakeModalOpen(true)}
+              className="text-xs font-semibold text-[#a17038] hover:text-[#8a5f2e] transition-colors"
+            >
+              Take Quiz
+            </button>
+          )
         )}
       </div>
 

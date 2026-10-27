@@ -1,4 +1,4 @@
-export type QuizStatus = 'DRAFT' | 'PUBLISHED';
+export type QuizStatus = 'DRAFT' | 'PUBLISHED' | 'CLOSED';
 
 export type QuestionType = 'MULTIPLE_CHOICE' | 'ONE_WORD' | 'SHORT_ANSWER';
 
@@ -22,6 +22,7 @@ export interface Quiz {
   title: string;
   description: string;
   status: QuizStatus;
+  totalMarks?: number;
   createdAt: string;
   updatedAt: string;
   questions?: QuizQuestion[];

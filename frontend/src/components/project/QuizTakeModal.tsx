@@ -24,6 +24,8 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
   const [showPastScore, setShowPastScore] = useState(false)
   const [newQuestionNotice, setNewQuestionNotice] = useState<string | null>(null)
   const prevQuestionCountRef = useRef<number>(0)
+  const [isClosedQuiz, setIsClosedQuiz] = useState(initialQuiz.status === "CLOSED")
+  const [closedTotalMarks, setClosedTotalMarks] = useState<number>(initialQuiz.totalMarks || 0)
   const [questionStates, setQuestionStates] = useState<
     Record<
       string,
@@ -45,10 +47,20 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
         getMySubmission(projectId, initialQuiz.id).catch(() => ({
           submitted: false,
           isOutdated: false,
+          isClosed: false,
+          totalMarks: 0,
           submission: null,
           questionStates: {},
         })),
       ])
+
+      const isClosedNow = quizData?.status === "CLOSED" || subStatus?.isClosed === true
+      setIsClosedQuiz(isClosedNow)
+      if (quizData?.totalMarks !== undefined) {
+        setClosedTotalMarks(quizData.totalMarks)
+      } else if (subStatus?.totalMarks !== undefined) {
+        setClosedTotalMarks(subStatus.totalMarks)
+      }
 
       if (quizData?.questions) {
         const newCount = quizData.questions.length
@@ -82,12 +94,19 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
       // Check if any question in quizData is missing an answer or has an empty answer in the submission
       const sub = subStatus.submission
       const answersMap = new Map((sub?.answers || []).map((a: any) => [a.questionId, a.answerText]))
-      const hasUnansweredQuestion = (quizData.questions || []).some((q: any) => {
+      const hasUnansweredQuestion = (quizData?.questions || []).some((q: any) => {
         const ans = answersMap.get(q.id)
         return !ans || (typeof ans === "string" && ans.trim() === "")
       })
 
-      if (subStatus.isOutdated || (sub && hasUnansweredQuestion)) {
+      if (isClosedNow) {
+        setIsOutdated(false)
+        if (subStatus.submission) {
+          setSubmittedData(subStatus.submission)
+        } else {
+          setSubmittedData(null)
+        }
+      } else if (subStatus.isOutdated || (sub && hasUnansweredQuestion)) {
         setIsOutdated(true)
         setPastSubmission(subStatus.submission)
         setSubmittedData(null)
@@ -170,7 +189,7 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
   }
 
   const handleSubmit = async () => {
-    if (!quiz) return
+    if (!quiz || isClosedQuiz) return
     setIsSubmitting(true)
     try {
       const answerPayload = Object.entries(answers).map(([questionId, answerText]) => ({
@@ -187,15 +206,25 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
     }
   }
 
-  const maxScore = quiz?.questions?.reduce((sum, q) => sum + q.marks, 0) || 0
+  const maxScore =
+    closedTotalMarks ||
+    quiz?.totalMarks ||
+    (quiz?.questions?.length ? quiz.questions.reduce((sum, q) => sum + q.marks, 0) : 0)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden border border-gray-200">
         <div className="flex justify-between items-center p-5 border-b border-gray-200 bg-gray-50/50 flex-shrink-0">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">{initialQuiz.title}</h2>
-            {submittedData && (
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold text-gray-900">{quiz?.title || initialQuiz.title}</h2>
+              {isClosedQuiz && (
+                <span className="text-[11px] font-bold text-rose-700 bg-rose-100 px-2.5 py-0.5 rounded-full border border-rose-200 flex items-center gap-1">
+                  <Lock size={10} /> Closed
+                </span>
+              )}
+            </div>
+            {submittedData && !isClosedQuiz && (
               <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded inline-flex items-center gap-1 mt-1">
                 <CheckCircle2 size={12} /> Previously Submitted
               </span>
@@ -211,6 +240,75 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
             <div className="flex flex-col items-center justify-center py-16 text-gray-500 gap-3">
               <div className="w-8 h-8 border-3 border-[#a17038] border-t-transparent rounded-full animate-spin" />
               <span className="text-sm font-medium">Loading quiz details...</span>
+            </div>
+          ) : isClosedQuiz ? (
+            <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+              <div className="w-16 h-16 bg-rose-50 border border-rose-200 text-rose-600 rounded-full flex items-center justify-center shadow-sm mb-3">
+                <Lock size={30} className="text-rose-500" />
+              </div>
+
+              <span className="text-xs font-bold uppercase tracking-wider text-rose-700 bg-rose-100/90 px-3 py-1 rounded-full border border-rose-200">
+                Quiz Closed
+              </span>
+
+              <h3 className="text-2xl font-black text-gray-900 mt-3">This Quiz is Closed</h3>
+              <p className="text-xs text-gray-500 mt-1 max-w-md">
+                The quiz creator has closed this quiz. Individual questions and responses are not accessible.
+              </p>
+
+              {/* Show Total Marks Only */}
+              {submittedData ? (
+                <div className="mt-6 bg-gradient-to-br from-amber-50 to-orange-50/50 border-2 border-amber-300/80 rounded-2xl px-10 py-6 text-center shadow-md max-w-sm w-full">
+                  <span className="text-xs font-bold text-amber-900 uppercase tracking-widest block">
+                    Your Total Score
+                  </span>
+                  <div className="flex items-baseline justify-center gap-1.5 mt-2">
+                    <span className="text-5xl font-black text-[#a17038]">
+                      {submittedData.totalScore !== null && submittedData.totalScore !== undefined
+                        ? submittedData.totalScore
+                        : 0}
+                    </span>
+                    {maxScore > 0 && (
+                      <span className="text-2xl font-bold text-amber-700/80">
+                        / {maxScore}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs font-medium text-amber-800/80 mt-1 block">
+                    {maxScore > 0 && submittedData.totalScore !== null
+                      ? `${Math.round((submittedData.totalScore / maxScore) * 100)}% achieved`
+                      : "Total Marks"}
+                  </span>
+                  {submittedData.submittedAt && (
+                    <div className="mt-4 pt-3 border-t border-amber-200/80 text-[11px] text-gray-500 flex items-center justify-center gap-1">
+                      <Clock size={12} />
+                      Submitted on {new Date(submittedData.submittedAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-6 bg-gray-50 border border-gray-200 rounded-2xl px-10 py-6 text-center shadow-sm max-w-sm w-full">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-widest block">
+                    Total Marks of Quiz
+                  </span>
+                  <div className="mt-2 text-4xl font-black text-gray-800">
+                    {maxScore} {maxScore === 1 ? "mark" : "marks"}
+                  </div>
+                  <div className="mt-3 text-xs text-rose-600 font-medium bg-rose-50 py-1.5 px-3 rounded-lg border border-rose-100">
+                    You did not submit this quiz before it was closed.
+                  </div>
+                </div>
+              )}
+
+              <p className="mt-6 text-xs text-gray-400 italic">
+                Only total marks are displayed. Individual questions and answers are hidden after quiz closure.
+              </p>
             </div>
           ) : submittedData ? (
             <div className="flex flex-col items-center justify-center py-8 gap-6">
@@ -443,35 +541,36 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
           )}
         </div>
 
-        {!loading && !submittedData && quiz && (
+        {/* Footer */}
+        {!loading && (
           <div className="p-5 border-t border-gray-200 flex justify-end gap-3 bg-gray-50/50">
-            <button
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-black"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="px-6 py-2 text-sm font-semibold text-white rounded-lg hover:opacity-95 shadow-sm"
-              style={{ backgroundColor: "#a17038" }}
-            >
-              {isSubmitting ? "Submitting..." : isOutdated ? "Submit Updated Quiz" : "Submit Answers"}
-            </button>
-          </div>
-        )}
-
-        {submittedData && (
-          <div className="p-5 border-t border-gray-200 flex justify-end gap-3 bg-gray-50/50">
-            <button
-              onClick={onClose}
-              className="px-6 py-2 text-sm font-semibold text-white rounded-lg hover:opacity-95 shadow-sm"
-              style={{ backgroundColor: "#a17038" }}
-            >
-              Close
-            </button>
+            {isClosedQuiz || submittedData ? (
+              <button
+                onClick={onClose}
+                className="px-6 py-2 text-sm font-semibold text-white rounded-lg hover:opacity-95 shadow-sm"
+                style={{ backgroundColor: "#a17038" }}
+              >
+                Close
+              </button>
+            ) : quiz ? (
+              <>
+                <button
+                  onClick={onClose}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-black"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                  className="px-6 py-2 text-sm font-semibold text-white rounded-lg hover:opacity-95 shadow-sm"
+                  style={{ backgroundColor: "#a17038" }}
+                >
+                  {isSubmitting ? "Submitting..." : isOutdated ? "Submit Updated Quiz" : "Submit Answers"}
+                </button>
+              </>
+            ) : null}
           </div>
         )}
       </div>

@@ -331,7 +331,11 @@ export default function QuizAnalyticsPage() {
                     <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Quiz Analytics
                     </span>
-                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded ${analytics.status === 'PUBLISHED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
+                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded ${
+                      analytics.status === 'PUBLISHED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                      analytics.status === 'CLOSED' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+                      'bg-gray-100 text-gray-600'
+                    }`}>
                       {analytics.status}
                     </span>
                   </div>

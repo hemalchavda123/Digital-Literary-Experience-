@@ -314,7 +314,9 @@ export function AnnotationSidebar({
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold text-gray-900">{linkedQuiz.title}</span>
                         <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                          linkedQuiz.status === 'PUBLISHED' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700'
+                          linkedQuiz.status === 'PUBLISHED' ? 'bg-green-100 text-green-700' :
+                          linkedQuiz.status === 'CLOSED' ? 'bg-rose-100 text-rose-700' :
+                          'bg-gray-200 text-gray-700'
                         }`}>
                           {linkedQuiz.status}
                         </span>
@@ -343,6 +345,13 @@ export function AnnotationSidebar({
                               Analytics
                             </button>
                           </>
+                        ) : linkedQuiz.status === 'CLOSED' ? (
+                          <button
+                            onClick={() => setTakeQuizModal(linkedQuiz)}
+                            className="w-full text-xs bg-gray-100 text-gray-800 hover:bg-gray-200 px-3 py-1.5 rounded-md font-semibold transition-colors shadow-sm text-center flex items-center justify-center gap-1.5"
+                          >
+                            <span>🔒</span> View Result (Closed)
+                          </button>
                         ) : (
                           <button
                             onClick={() => setTakeQuizModal(linkedQuiz)}
