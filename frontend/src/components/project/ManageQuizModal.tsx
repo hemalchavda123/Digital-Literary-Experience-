@@ -84,6 +84,7 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
         description: description.trim(),
         status,
         questions: questions.map((q) => ({
+          ...(typeof q.id === "string" && !q.id.startsWith("temp-") ? { id: q.id } : {}),
           type: q.type,
           questionText: q.questionText,
           options: q.type === "MULTIPLE_CHOICE" ? q.options : null,
@@ -203,6 +204,7 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
         description: description.trim(),
         status: finalStatus,
         questions: questions.map((q) => ({
+          ...(typeof q.id === "string" && !q.id.startsWith("temp-") ? { id: q.id } : {}),
           type: q.type,
           questionText: q.questionText,
           options: q.type === "MULTIPLE_CHOICE" ? q.options : null,
