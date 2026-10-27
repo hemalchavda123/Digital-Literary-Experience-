@@ -80,7 +80,15 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
         })
       }
 
-      if (subStatus.isOutdated) {
+      // Check if any question in quizData is missing an answer or has an empty answer in the submission
+      const sub = subStatus.submission
+      const answersMap = new Map((sub?.answers || []).map((a: any) => [a.questionId, a.answerText]))
+      const hasUnansweredQuestion = (quizData.questions || []).some((q: any) => {
+        const ans = answersMap.get(q.id)
+        return !ans || (typeof ans === "string" && ans.trim() === "")
+      })
+
+      if (subStatus.isOutdated || (sub && hasUnansweredQuestion)) {
         setIsOutdated(true)
         setPastSubmission(subStatus.submission)
         setSubmittedData(null)

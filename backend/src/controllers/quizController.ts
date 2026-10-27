@@ -241,8 +241,16 @@ export const updateQuiz = async (req: Request, res: Response, next: NextFunction
       include: { answers: true },
     });
 
+    // Clean up any empty/blank answers previously saved for questions in this quiz so students can answer them
+    await prisma.quizAnswer.deleteMany({
+      where: {
+        submission: { quizId },
+        answerText: '',
+      },
+    });
+
     for (const sub of submissions) {
-      const validAnswers = sub.answers.filter((a) => activeQuestionIds.has(a.questionId));
+      const validAnswers = sub.answers.filter((a) => activeQuestionIds.has(a.questionId) && a.answerText && a.answerText.trim() !== '');
       const newScore = validAnswers.reduce((sum, a) => sum + (a.score || 0), 0);
       if (sub.totalScore !== newScore) {
         await prisma.quizSubmission.update({
@@ -403,16 +411,25 @@ export const submitQuiz = async (req: Request, res: Response, next: NextFunction
     for (const question of quiz.questions) {
       const prevAns = prevAnswersMap.get(question.id);
       const qUpdatedAt = question.updatedAt ? new Date(question.updatedAt).getTime() : 0;
-      // An existing question is UNCHANGED if user previously answered it and question was NOT updated after user's submission
-      const isUnchanged = Boolean(existingSubmission && prevAns && qUpdatedAt <= subSubmittedAt);
+      // An existing question is UNCHANGED if user previously answered it with text and question was NOT updated after user's submission
+      const isUnchanged = Boolean(
+        existingSubmission && 
+        prevAns && 
+        prevAns.answerText && 
+        prevAns.answerText.trim() !== '' && 
+        qUpdatedAt <= subSubmittedAt
+      );
 
       let answerText = '';
       if (isUnchanged && prevAns) {
         // Strictly preserve previously submitted answer for unchanged questions
         answerText = prevAns.answerText;
-      } else {
+      } else if (incomingAnswersMap.has(question.id)) {
         // For new or modified questions, accept the incoming answer
         answerText = incomingAnswersMap.get(question.id) || '';
+      } else {
+        // Question was not answered in incoming payload and has no previous answer - do not create a fake blank answer row
+        continue;
       }
 
       // Grade the answer
@@ -540,8 +557,8 @@ export const getMySubmission = async (req: Request, res: Response, next: NextFun
       for (const q of quiz.questions) {
         const prevAns = answersMap.get(q.id);
 
-        if (!prevAns) {
-          // New question added/published since submission
+        if (!prevAns || !prevAns.answerText || prevAns.answerText.trim() === '') {
+          // New question added/published since submission, or question has no answer
           questionStates[q.id] = {
             status: 'NEW',
             previousAnswer: null,

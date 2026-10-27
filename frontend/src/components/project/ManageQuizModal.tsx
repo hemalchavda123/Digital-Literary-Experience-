@@ -265,7 +265,12 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
         {/* Header */}
         <div className="flex justify-between items-center p-5 border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center gap-4">
-            <h2 className="text-xl font-bold text-gray-900">Manage Quiz</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold text-gray-900">Manage Quiz</h2>
+              <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${status === 'PUBLISHED' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700'}`}>
+                {status === 'PUBLISHED' ? 'Published' : 'Draft'}
+              </span>
+            </div>
             {autoSaveStatus !== "idle" && (
               <span className={`text-xs font-medium px-2.5 py-1 rounded-full flex items-center gap-1.5 transition-opacity ${
                 autoSaveStatus === "saving"
@@ -551,6 +556,15 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
           >
             Cancel
           </button>
+          {status === 'DRAFT' && (
+            <button
+              onClick={() => handleSave("PUBLISHED")}
+              disabled={isSubmitting}
+              className="px-5 py-2 font-medium text-white rounded bg-emerald-600 hover:bg-emerald-700 shadow-sm transition-colors text-sm"
+            >
+              Publish Quiz
+            </button>
+          )}
           <button
             onClick={() => handleSave()}
             disabled={isSubmitting}
