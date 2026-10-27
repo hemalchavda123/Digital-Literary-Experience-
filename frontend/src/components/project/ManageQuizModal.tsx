@@ -114,11 +114,12 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
       setAutoSaveStatus("saved")
 
       if (updatedQuiz && Array.isArray(updatedQuiz.questions)) {
+        const savedQuestions = updatedQuiz.questions
         // Map backend-assigned IDs to any temp- questions so subsequent updates preserve them
         setQuestions((current) => {
           const updatedList = current.map((q, idx) => {
-            if (typeof q.id === "string" && q.id.startsWith("temp-") && updatedQuiz.questions[idx]) {
-              return { ...q, id: updatedQuiz.questions[idx].id }
+            if (typeof q.id === "string" && q.id.startsWith("temp-") && savedQuestions[idx]) {
+              return { ...q, id: savedQuestions[idx].id }
             }
             return q
           })
