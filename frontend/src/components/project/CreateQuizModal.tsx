@@ -297,29 +297,34 @@ export function CreateQuizModal({ projectId, documentId, annotationId, onClose }
           </div>
         </div>
 
-        <div className="p-5 border-t border-gray-200 flex justify-end gap-3 bg-gray-50">
-          <button
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="px-4 py-2 font-medium text-gray-700 hover:text-black"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => handleSubmit("DRAFT")}
-            disabled={isSubmitting}
-            className="px-4 py-2 font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
-          >
-            Save as Draft
-          </button>
-          <button
-            onClick={() => handleSubmit("PUBLISHED")}
-            disabled={isSubmitting}
-            className="px-4 py-2 font-medium text-white rounded hover:opacity-95"
-            style={{ backgroundColor: "#a17038" }}
-          >
-            Publish Now
-          </button>
+        <div className="p-5 border-t border-gray-200 flex justify-between items-center bg-gray-50 flex-wrap gap-3">
+          <span className="text-xs text-gray-500 italic">
+            Note: "Save as Draft" keeps the quiz hidden from other members until you publish it.
+          </span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="px-4 py-2 font-medium text-gray-700 hover:text-black"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleSubmit("DRAFT")}
+              disabled={isSubmitting}
+              className="px-4 py-2 font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+            >
+              Save as Draft
+            </button>
+            <button
+              onClick={() => handleSubmit("PUBLISHED")}
+              disabled={isSubmitting}
+              className="px-4 py-2 font-medium text-white rounded hover:opacity-95"
+              style={{ backgroundColor: "#a17038" }}
+            >
+              Publish Now
+            </button>
+          </div>
         </div>
       </div>
     </div>

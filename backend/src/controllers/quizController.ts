@@ -31,7 +31,7 @@ export const getQuizzes = async (req: Request, res: Response, next: NextFunction
         projectId,
         ...(documentId ? { documentId } : {}),
         ...(annotationId ? { annotationId } : {}),
-        ...(isOwner ? {} : { status: { in: ['PUBLISHED', 'CLOSED'] } }),
+        ...(isOwner ? {} : { status: { not: 'DRAFT' } }),
       },
       include: {
         _count: {
@@ -49,9 +49,9 @@ export const getQuizzes = async (req: Request, res: Response, next: NextFunction
         ? quiz.questions
         : quiz.questions.filter((q) => q.isPublished);
       const totalMarks = activeQuestions.reduce((sum, q) => sum + (q.marks || 0), 0);
-      const { questions, ...rest } = quiz;
       return {
-        ...rest,
+        ...quiz,
+        questions: activeQuestions,
         totalMarks,
       };
     });
@@ -77,7 +77,7 @@ export const getQuizById = async (req: Request, res: Response, next: NextFunctio
       where: {
         id: quizId,
         projectId,
-        ...(isOwner ? {} : { status: { in: ['PUBLISHED', 'CLOSED'] } }),
+        ...(isOwner ? {} : { status: { not: 'DRAFT' } }),
       },
       include: {
         questions: {
@@ -590,6 +590,7 @@ export const getMySubmission = async (req: Request, res: Response, next: NextFun
         submitted: !!submission,
         isOutdated: false,
         isClosed: true,
+        isOwner: false,
         totalMarks,
         submission: submission
           ? {
@@ -669,6 +670,7 @@ export const getMySubmission = async (req: Request, res: Response, next: NextFun
       submitted: !!submission && !isOutdated,
       isOutdated,
       isClosed: quiz.status === 'CLOSED',
+      isOwner,
       totalMarks,
       submission,
       questionStates,

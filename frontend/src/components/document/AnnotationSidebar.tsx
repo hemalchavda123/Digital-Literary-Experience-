@@ -326,6 +326,12 @@ export function AnnotationSidebar({
                         {isOwner ? (
                           <>
                             <button
+                              onClick={() => setTakeQuizModal(linkedQuiz)}
+                              className="text-xs bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 px-2.5 py-1 rounded font-semibold transition-colors"
+                            >
+                              Preview
+                            </button>
+                            <button
                               onClick={() => setManageQuizModal(linkedQuiz)}
                               className="text-xs bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 px-2.5 py-1 rounded font-semibold transition-colors"
                             >

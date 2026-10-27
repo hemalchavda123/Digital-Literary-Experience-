@@ -48,13 +48,15 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
           submitted: false,
           isOutdated: false,
           isClosed: false,
+          isOwner: false,
           totalMarks: 0,
           submission: null,
           questionStates: {},
         })),
       ])
 
-      const isClosedNow = quizData?.status === "CLOSED" || subStatus?.isClosed === true
+      const isOwnerUser = subStatus?.isOwner === true
+      const isClosedNow = !isOwnerUser && (quizData?.status === "CLOSED" || subStatus?.isClosed === true)
       setIsClosedQuiz(isClosedNow)
       if (quizData?.totalMarks !== undefined) {
         setClosedTotalMarks(quizData.totalMarks)
@@ -400,7 +402,8 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
               )}
 
               <div className="flex flex-col gap-8 mt-2">
-                {quiz.questions?.map((q: QuizQuestion, index: number) => {
+                {quiz.questions && quiz.questions.length > 0 ? (
+                  quiz.questions.map((q: QuizQuestion, index: number) => {
                   const options = q.options ? JSON.parse(q.options) : []
                   const qState = questionStates[q.id]
                   const isLocked = qState?.status === "UNCHANGED"
@@ -533,7 +536,12 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
                       </div>
                     </div>
                   )
-                })}
+                })
+              ) : (
+                <div className="text-center py-12 bg-gray-50 border border-dashed border-gray-200 rounded-xl text-gray-500 text-sm">
+                  No published questions available for this quiz yet.
+                </div>
+              )}
               </div>
             </>
           ) : (
@@ -563,9 +571,13 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
                 </button>
                 <button
                   onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className="px-6 py-2 text-sm font-semibold text-white rounded-lg hover:opacity-95 shadow-sm"
-                  style={{ backgroundColor: "#a17038" }}
+                  disabled={isSubmitting || !quiz.questions || quiz.questions.length === 0}
+                  className={`px-6 py-2 text-sm font-semibold text-white rounded-lg transition-all shadow-sm ${
+                    !quiz.questions || quiz.questions.length === 0
+                      ? "opacity-50 cursor-not-allowed bg-gray-400"
+                      : "hover:opacity-95"
+                  }`}
+                  style={{ backgroundColor: !quiz.questions || quiz.questions.length === 0 ? undefined : "#a17038" }}
                 >
                   {isSubmitting ? "Submitting..." : isOutdated ? "Submit Updated Quiz" : "Submit Answers"}
                 </button>

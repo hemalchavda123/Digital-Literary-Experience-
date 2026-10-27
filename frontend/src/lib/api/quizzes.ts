@@ -108,6 +108,7 @@ export const getMySubmission = async (
   submitted: boolean;
   isOutdated?: boolean;
   isClosed?: boolean;
+  isOwner?: boolean;
   totalMarks?: number;
   submission: QuizSubmission | null;
   questionStates?: Record<

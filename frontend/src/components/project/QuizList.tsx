@@ -150,6 +150,12 @@ function QuizItem({
               </button>
             )}
             <button
+              onClick={() => setTakeModalOpen(true)}
+              className="text-xs font-semibold text-gray-700 hover:text-black transition-colors bg-gray-100 hover:bg-gray-200 px-2.5 py-1 rounded flex items-center gap-1"
+            >
+              Preview Quiz
+            </button>
+            <button
               onClick={() => setManageModalOpen(true)}
               className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors"
             >
@@ -222,7 +228,7 @@ interface Props {
 }
 
 export function QuizList({ projectId, isOwner, currentUserId }: Props) {
-  const { quizzesForProject } = useProjects()
+  const { quizzesForProject, fetchQuizzes } = useProjects()
   const { joinProject } = useSocket()
   const quizzes = quizzesForProject(projectId)
   const [createModalOpen, setCreateModalOpen] = useState(false)
@@ -230,8 +236,9 @@ export function QuizList({ projectId, isOwner, currentUserId }: Props) {
   useEffect(() => {
     if (projectId) {
       joinProject(projectId)
+      fetchQuizzes(projectId)
     }
-  }, [projectId, joinProject])
+  }, [projectId, joinProject, fetchQuizzes])
 
   return (
     <div className="flex flex-col gap-6 mt-4">
