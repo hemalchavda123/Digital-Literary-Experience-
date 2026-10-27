@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useProjects } from "@/context/ProjectContext"
 import { QuestionType, Quiz, QuizQuestion } from "@/types/quiz"
 import { getQuizById } from "@/lib/api/quizzes"
@@ -37,6 +37,11 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
   const [questions, setQuestions] = useState<TempQuestion[]>([])
   
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hasLoadedRef = useRef(false)
+  const isFirstRenderAfterLoad = useRef(true)
 
   useEffect(() => {
     getQuizById(projectId, quizId)
@@ -56,12 +61,62 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
           }))
         )
         setLoading(false)
+        // Mark that initial data has loaded; the next state change is user-driven
+        setTimeout(() => {
+          hasLoadedRef.current = true
+          isFirstRenderAfterLoad.current = true
+        }, 0)
       })
       .catch((err) => {
         console.error("Failed to load quiz", err)
         setLoading(false)
       })
   }, [projectId, quizId])
+
+  // Debounced auto-save
+  const performAutoSave = useCallback(async () => {
+    if (!title.trim() || questions.length === 0) return
+
+    setAutoSaveStatus("saving")
+    try {
+      await updateQuiz(projectId, quizId, {
+        title: title.trim(),
+        description: description.trim(),
+        status,
+        questions: questions.map((q) => ({
+          type: q.type,
+          questionText: q.questionText,
+          options: q.type === "MULTIPLE_CHOICE" ? q.options : null,
+          marks: q.marks,
+          correctAnswer: q.correctAnswer.trim() || null,
+          isPublished: q.isPublished,
+        })),
+      })
+      setAutoSaveStatus("saved")
+    } catch (error) {
+      console.error("Auto-save failed", error)
+      setAutoSaveStatus("error")
+    }
+  }, [projectId, quizId, title, description, status, questions, updateQuiz])
+
+  useEffect(() => {
+    if (!hasLoadedRef.current) return
+
+    // Skip the first render cycle after load to avoid saving the initial state
+    if (isFirstRenderAfterLoad.current) {
+      isFirstRenderAfterLoad.current = false
+      return
+    }
+
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      performAutoSave()
+    }, 1500)
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [title, description, questions, performAutoSave])
 
   const handleAddQuestion = () => {
     setQuestions([
@@ -175,6 +230,34 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
         <div className="flex justify-between items-center p-5 border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center gap-4">
             <h2 className="text-xl font-bold text-gray-900">Manage Quiz</h2>
+            {autoSaveStatus !== "idle" && (
+              <span className={`text-xs font-medium px-2.5 py-1 rounded-full flex items-center gap-1.5 transition-opacity ${
+                autoSaveStatus === "saving"
+                  ? "text-gray-500 bg-gray-100"
+                  : autoSaveStatus === "saved"
+                  ? "text-emerald-700 bg-emerald-50"
+                  : "text-red-700 bg-red-50"
+              }`}>
+                {autoSaveStatus === "saving" && (
+                  <>
+                    <span className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                    Saving...
+                  </>
+                )}
+                {autoSaveStatus === "saved" && (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    All changes saved
+                  </>
+                )}
+                {autoSaveStatus === "error" && (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                    Save failed
+                  </>
+                )}
+              </span>
+            )}
             <div className="flex bg-gray-100 rounded-lg p-1">
               <button
                 onClick={() => setActiveTab("edit")}
