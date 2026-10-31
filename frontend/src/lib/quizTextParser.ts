@@ -91,6 +91,17 @@ interface DraftQuestion {
   isPublished: boolean
 }
 
+function createDraft(): DraftQuestion {
+  return {
+    questionLines: [],
+    options: [],
+    marks: undefined,
+    correctAnswer: undefined,
+    explicitType: undefined,
+    isPublished: true,
+  }
+}
+
 /**
  * Parses raw text containing multiple questions into structured quiz questions.
  * Supports:
@@ -112,19 +123,12 @@ export function parseQuizQuestionsFromText(inputText: string): ParseQuizResult {
   let currentDraft: DraftQuestion | null = null
   let sawBlankLine = false
 
-  const startNewDraft = () => {
+  const startNewDraft = (): DraftQuestion => {
     if (currentDraft) {
       drafts.push(currentDraft)
     }
-    currentDraft = {
-      questionLines: [],
-      options: [],
-      marks: undefined,
-      correctAnswer: undefined,
-      explicitType: undefined,
-      isPublished: true,
-    }
     sawBlankLine = false
+    return createDraft()
   }
 
   for (let i = 0; i < lines.length; i++) {
@@ -145,7 +149,7 @@ export function parseQuizQuestionsFromText(inputText: string): ParseQuizResult {
     // Check horizontal rule / separator: "---", "===", "***"
     if (/^[-=_*]{3,}$/.test(line)) {
       if (currentDraft) {
-        startNewDraft()
+        currentDraft = startNewDraft()
       }
       continue
     }
@@ -160,7 +164,7 @@ export function parseQuizQuestionsFromText(inputText: string): ParseQuizResult {
     )
 
     if (qHeaderMatch || bracketTypeMatch) {
-      startNewDraft()
+      currentDraft = startNewDraft()
       let text = qHeaderMatch ? qHeaderMatch[1].trim() : line
 
       // Extract bracket type if present
@@ -209,13 +213,12 @@ export function parseQuizQuestionsFromText(inputText: string): ParseQuizResult {
       currentDraft &&
       (currentDraft.options.length > 0 || currentDraft.correctAnswer !== undefined)
     ) {
-      startNewDraft()
+      currentDraft = startNewDraft()
     }
 
     if (!currentDraft) {
-      startNewDraft()
+      currentDraft = startNewDraft()
     }
-    if (!currentDraft) continue
 
     // Check Type metadata: "Type: Multiple Choice", "Type: One Word", "Type: Short Answer"
     const typeMetaMatch = line.match(/^(?:type|question\s*type)\s*[:=\-]\s*(.+)$/i)

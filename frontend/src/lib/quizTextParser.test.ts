@@ -2,7 +2,7 @@ import assert from "node:assert"
 import {
   parseQuizQuestionsFromText,
   SAMPLE_QUIZ_TEMPLATES,
-} from "./quizTextParser.ts"
+} from "./quizTextParser"
 
 console.log("Starting Quiz Text Parser Tests...\n")
 
