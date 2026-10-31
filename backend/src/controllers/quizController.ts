@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import prisma from '../config/db';
 import { getIo } from '../socket';
+import ExcelJS from 'exceljs';
 
 // Helper to check project membership or ownership
 async function checkProjectAccess(projectId: string, userId: string) {
@@ -970,6 +971,363 @@ export const getPdfQuizAnalytics = async (req: Request, res: Response, next: Nex
       recommendedChart: totalPdfQuizzes <= 4 ? 'pie' : 'bar',
       quizSummaries,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// EXCEL EXPORT FOR QUIZ ANSWERS (ACCESSIBLE ONLY TO QUIZ MAKER AFTER QUIZ IS CLOSED)
+export const exportQuizAnswersExcel = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const projectId = req.params.projectId as string;
+    const quizId = req.params.quizId as string;
+    const userId = (req as any).user?.userId;
+
+    // 1. Authorization: ONLY project owner (quiz maker) has access
+    const { isOwner } = await checkProjectAccess(projectId, userId);
+    if (!isOwner) {
+      return res.status(403).json({ message: 'Only the quiz creator can download quiz answers data' });
+    }
+
+    // 2. Fetch quiz details, questions, and all submissions with user answers
+    const quiz = await prisma.quiz.findUnique({
+      where: { id: quizId },
+      include: {
+        questions: {
+          orderBy: { order: 'asc' },
+        },
+        submissions: {
+          include: {
+            user: { select: { id: true, username: true, email: true } },
+            answers: true,
+          },
+          orderBy: { submittedAt: 'desc' },
+        },
+      },
+    });
+
+    if (!quiz || quiz.projectId !== projectId) {
+      return res.status(404).json({ message: 'Quiz not found' });
+    }
+
+    // 3. Condition: ONLY available after the quiz is closed
+    if (quiz.status !== 'CLOSED') {
+      return res.status(400).json({
+        message: 'Quiz answers data is only available and downloadable after the quiz is closed',
+      });
+    }
+
+    // 4. Generate the Excel workbook using ExcelJS
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Digital Literary Experience';
+    workbook.lastModifiedBy = 'Digital Literary Experience';
+    workbook.created = new Date();
+    workbook.modified = new Date();
+
+    const questions = quiz.questions;
+    const questionIds = new Set(questions.map((q) => q.id));
+    const maxPossibleScore = questions.reduce((sum, q) => sum + (q.marks || 1), 0);
+    const submissions = quiz.submissions;
+    const totalSubmissions = submissions.length;
+
+    // Common styling
+    const headerFill: ExcelJS.Fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF1E293B' }, // Dark slate
+    };
+    const headerFont: Partial<ExcelJS.Font> = {
+      name: 'Calibri',
+      bold: true,
+      color: { argb: 'FFFFFFFF' },
+      size: 11,
+    };
+    const borderStyle: Partial<ExcelJS.Borders> = {
+      top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+    };
+
+    // ---------------------------------------------------------
+    // SHEET 1: Summary & Responses Matrix (Which user answered what)
+    // ---------------------------------------------------------
+    const sheet1 = workbook.addWorksheet('Student Responses');
+
+    // Title & Info
+    sheet1.addRow([`QUIZ ANSWERS REPORT: ${quiz.title.toUpperCase()}`]);
+    sheet1.mergeCells('A1:F1');
+    const titleCell = sheet1.getCell('A1');
+    titleCell.font = { name: 'Calibri', bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
+    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+    titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+    sheet1.getRow(1).height = 30;
+
+    sheet1.addRow([]); // Row 2 empty
+    sheet1.addRow(['Quiz Status:', quiz.status, 'Total Questions:', questions.length, 'Total Submissions:', totalSubmissions]);
+    sheet1.addRow(['Export Date:', new Date().toISOString().replace('T', ' ').substring(0, 19), 'Max Marks:', maxPossibleScore, 'Description:', quiz.description || 'N/A']);
+    sheet1.getRow(3).font = { bold: true };
+    sheet1.getRow(4).font = { bold: true };
+    sheet1.addRow([]); // Row 5 empty
+
+    // Headers for table
+    const tableHeaderRow = [
+      'Student Username',
+      'Student Email',
+      'Submission Date',
+      'Total Score',
+      'Max Marks',
+      'Score %',
+    ];
+
+    questions.forEach((q, idx) => {
+      const qNum = idx + 1;
+      const truncatedText = q.questionText.length > 35 ? `${q.questionText.slice(0, 32)}...` : q.questionText;
+      tableHeaderRow.push(`Q${qNum}: ${truncatedText} [Answer]`);
+      tableHeaderRow.push(`Q${qNum} Result`);
+      tableHeaderRow.push(`Q${qNum} Marks`);
+    });
+
+    sheet1.addRow(tableHeaderRow);
+    const sheet1HeaderRowIndex = 6;
+    const s1HeaderRow = sheet1.getRow(sheet1HeaderRowIndex);
+    s1HeaderRow.height = 26;
+    s1HeaderRow.eachCell((cell) => {
+      cell.fill = headerFill;
+      cell.font = headerFont;
+      cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+      cell.border = borderStyle;
+    });
+
+    // Populate student submissions
+    submissions.forEach((sub) => {
+      const answersMap = new Map((sub.answers || []).map((a) => [a.questionId, a]));
+      const validAnswers = (sub.answers || []).filter((a) => questionIds.has(a.questionId));
+      const studentScore = validAnswers.reduce((sum, a) => sum + (a.score || 0), 0);
+      const pct = maxPossibleScore > 0 ? Math.round((studentScore / maxPossibleScore) * 100) : 0;
+      const submittedDateStr = sub.submittedAt ? new Date(sub.submittedAt).toISOString().replace('T', ' ').substring(0, 19) : 'N/A';
+
+      const rowValues: (string | number)[] = [
+        sub.user?.username || 'Unknown',
+        sub.user?.email || 'N/A',
+        submittedDateStr,
+        studentScore,
+        maxPossibleScore,
+        `${pct}%`,
+      ];
+
+      questions.forEach((q) => {
+        const ans = answersMap.get(q.id);
+        const ansText = ans?.answerText && ans.answerText.trim() !== '' ? ans.answerText : '(No Answer)';
+        const result = ans
+          ? (ans.isCorrect === true ? 'Correct' : ans.isCorrect === false ? 'Incorrect' : 'Submitted')
+          : 'No Answer';
+        const score = ans?.score ?? 0;
+        rowValues.push(ansText, result, score);
+      });
+
+      const dataRow = sheet1.addRow(rowValues);
+      dataRow.height = 20;
+
+      dataRow.eachCell((cell, colNumber) => {
+        cell.border = borderStyle;
+        cell.alignment = { vertical: 'middle' };
+
+        // Center align timestamps, scores, percentages
+        if (colNumber >= 3 && colNumber <= 6) {
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        }
+
+        // Color coding for results
+        const cellValue = cell.value?.toString();
+        if (cellValue === 'Correct') {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } }; // light green
+          cell.font = { color: { argb: 'FF166534' }, bold: true };
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        } else if (cellValue === 'Incorrect') {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } }; // light red
+          cell.font = { color: { argb: 'FF991B1B' }, bold: true };
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        } else if (cellValue === 'No Answer') {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+          cell.font = { color: { argb: 'FF64748B' }, italic: true };
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        }
+      });
+    });
+
+    // ---------------------------------------------------------
+    // SHEET 2: Itemized Answer Log (Individual Answer per Row)
+    // ---------------------------------------------------------
+    const sheet2 = workbook.addWorksheet('Itemized Answers Log');
+    const sheet2Headers = [
+      'Student Username',
+      'Student Email',
+      'Submitted At',
+      'Question #',
+      'Question Type',
+      'Question Text',
+      'Correct Answer',
+      'Student Answer',
+      'Result',
+      'Marks Awarded',
+      'Max Marks',
+    ];
+
+    sheet2.addRow(sheet2Headers);
+    const s2HeaderRow = sheet2.getRow(1);
+    s2HeaderRow.height = 26;
+    s2HeaderRow.eachCell((cell) => {
+      cell.fill = headerFill;
+      cell.font = headerFont;
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      cell.border = borderStyle;
+    });
+
+    submissions.forEach((sub) => {
+      const answersMap = new Map((sub.answers || []).map((a) => [a.questionId, a]));
+      const submittedDateStr = sub.submittedAt ? new Date(sub.submittedAt).toISOString().replace('T', ' ').substring(0, 19) : 'N/A';
+
+      questions.forEach((q, idx) => {
+        const ans = answersMap.get(q.id);
+        const ansText = ans?.answerText && ans.answerText.trim() !== '' ? ans.answerText : '(No Answer)';
+        const result = ans
+          ? (ans.isCorrect === true ? 'Correct' : ans.isCorrect === false ? 'Incorrect' : 'Submitted')
+          : 'No Answer';
+        const score = ans?.score ?? 0;
+
+        const row = sheet2.addRow([
+          sub.user?.username || 'Unknown',
+          sub.user?.email || 'N/A',
+          submittedDateStr,
+          `Q${idx + 1}`,
+          q.type,
+          q.questionText,
+          q.correctAnswer || 'N/A',
+          ansText,
+          result,
+          score,
+          q.marks || 1,
+        ]);
+        row.height = 20;
+
+        row.eachCell((cell, colNumber) => {
+          cell.border = borderStyle;
+          cell.alignment = { vertical: 'middle' };
+
+          if ([3, 4, 5, 9, 10, 11].includes(colNumber)) {
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+          }
+
+          if (colNumber === 9) {
+            const cellValue = cell.value?.toString();
+            if (cellValue === 'Correct') {
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } };
+              cell.font = { color: { argb: 'FF166534' }, bold: true };
+            } else if (cellValue === 'Incorrect') {
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+              cell.font = { color: { argb: 'FF991B1B' }, bold: true };
+            }
+          }
+        });
+      });
+    });
+
+    sheet2.autoFilter = { from: 'A1', to: 'K1' };
+
+    // ---------------------------------------------------------
+    // SHEET 3: Questions & Answer Key
+    // ---------------------------------------------------------
+    const sheet3 = workbook.addWorksheet('Questions & Answer Key');
+    const sheet3Headers = [
+      'Question #',
+      'Question Type',
+      'Question Text',
+      'Options (if MCQ)',
+      'Correct Answer',
+      'Max Marks',
+      'Total Answers',
+      'Correct Count',
+      'Incorrect Count',
+      'Accuracy %',
+    ];
+
+    sheet3.addRow(sheet3Headers);
+    const s3HeaderRow = sheet3.getRow(1);
+    s3HeaderRow.height = 26;
+    s3HeaderRow.eachCell((cell) => {
+      cell.fill = headerFill;
+      cell.font = headerFont;
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      cell.border = borderStyle;
+    });
+
+    questions.forEach((q, idx) => {
+      const allAns = submissions.flatMap((s) => (s.answers || []).filter((a) => a.questionId === q.id));
+      const totalAns = allAns.length;
+      const correctCount = allAns.filter((a) => a.isCorrect === true).length;
+      const incorrectCount = allAns.filter((a) => a.isCorrect === false).length;
+      const accuracy = totalAns > 0 ? Math.round((correctCount / totalAns) * 100) : 0;
+
+      let formattedOptions = 'N/A';
+      if (q.options) {
+        try {
+          const opts = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
+          if (Array.isArray(opts)) {
+            formattedOptions = opts.map((opt, i) => `${String.fromCharCode(65 + i)}) ${opt}`).join(' | ');
+          }
+        } catch {
+          formattedOptions = String(q.options);
+        }
+      }
+
+      const row = sheet3.addRow([
+        `Q${idx + 1}`,
+        q.type,
+        q.questionText,
+        formattedOptions,
+        q.correctAnswer || 'N/A',
+        q.marks || 1,
+        totalAns,
+        correctCount,
+        incorrectCount,
+        `${accuracy}%`,
+      ]);
+      row.height = 20;
+
+      row.eachCell((cell, colNumber) => {
+        cell.border = borderStyle;
+        cell.alignment = { vertical: 'middle' };
+        if ([1, 2, 5, 6, 7, 8, 9, 10].includes(colNumber)) {
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        }
+      });
+    });
+
+    sheet3.autoFilter = { from: 'A1', to: 'J1' };
+
+    // Auto-fit column widths across all sheets
+    [sheet1, sheet2, sheet3].forEach((sheet) => {
+      sheet.columns.forEach((col) => {
+        let maxLen = 10;
+        col.eachCell?.({ includeEmpty: false }, (cell) => {
+          const val = cell.value ? String(cell.value) : '';
+          const len = Math.min(val.length, 40);
+          if (len > maxLen) maxLen = len;
+        });
+        col.width = Math.max(maxLen + 3, 12);
+      });
+    });
+
+    // 5. Send file buffer with proper headers
+    const sanitizedTitle = (quiz.title || 'Quiz').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = `${sanitizedTitle}_Answers_${quiz.id.slice(0, 8)}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    res.send(Buffer.from(buffer));
   } catch (error) {
     next(error);
   }

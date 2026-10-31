@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { getQuizAnalytics } from "@/lib/api/quizzes"
+import { getQuizAnalytics, downloadQuizAnswersExcel } from "@/lib/api/quizzes"
 import type { QuizAnalytics, QuestionBreakdown, ResponseDistributionItem } from "@/types/quiz"
-import { X, PieChart, BarChart2, ListFilter, CheckCircle2, Users, HelpCircle, Award, Check } from "lucide-react"
+import { X, PieChart, BarChart2, ListFilter, CheckCircle2, Users, HelpCircle, Award, Check, FileSpreadsheet } from "lucide-react"
 
 interface Props {
   projectId: string
@@ -251,6 +251,18 @@ export function QuizAnalyticsModal({ projectId, quizId, quizTitle, onClose }: Pr
   const [analytics, setAnalytics] = useState<QuizAnalytics | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [downloading, setDownloading] = useState(false)
+
+  const handleDownloadExcel = async () => {
+    try {
+      setDownloading(true)
+      await downloadQuizAnswersExcel(projectId, quizId, analytics?.title || quizTitle)
+    } catch (err: any) {
+      alert(err.message || "Failed to download Excel file")
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   useEffect(() => {
     getQuizAnalytics(projectId, quizId)
@@ -294,12 +306,34 @@ export function QuizAnalyticsModal({ projectId, quizId, quizTitle, onClose }: Pr
               )}
             </div>
 
-            <button
-              onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
-            >
-              <X size={20} />
-            </button>
+            <div className="flex items-center gap-2">
+              {analytics?.status === 'CLOSED' ? (
+                <button
+                  onClick={handleDownloadExcel}
+                  disabled={downloading}
+                  className="text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
+                  title="Download complete quiz answers data in Excel (.xlsx) format"
+                >
+                  <FileSpreadsheet size={15} />
+                  {downloading ? "Downloading..." : "Download Excel"}
+                </button>
+              ) : (
+                <div
+                  className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg border border-gray-200 flex items-center gap-1.5"
+                  title="Excel download becomes available once the quiz is closed"
+                >
+                  <FileSpreadsheet size={13} className="text-gray-400" />
+                  <span>Excel available when closed</span>
+                </div>
+              )}
+
+              <button
+                onClick={onClose}
+                className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
 
           {/* Response Count Pill Banner */}

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react"
 import type { Quiz, QuizSubmission } from "@/types/quiz"
-import { getSubmissions } from "@/lib/api/quizzes"
+import { getSubmissions, downloadQuizAnswersExcel } from "@/lib/api/quizzes"
+import { FileSpreadsheet } from "lucide-react"
 
 interface Props {
   quiz: Quiz
@@ -13,6 +14,18 @@ interface Props {
 export function QuizSubmissionsModal({ quiz, projectId, onClose }: Props) {
   const [submissions, setSubmissions] = useState<QuizSubmission[]>([])
   const [loading, setLoading] = useState(true)
+  const [downloading, setDownloading] = useState(false)
+
+  const handleDownloadExcel = async () => {
+    try {
+      setDownloading(true)
+      await downloadQuizAnswersExcel(projectId, quiz.id, quiz.title)
+    } catch (err: any) {
+      alert(err.message || "Failed to download Excel file")
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   useEffect(() => {
     getSubmissions(projectId, quiz.id)
@@ -30,10 +43,42 @@ export function QuizSubmissionsModal({ quiz, projectId, onClose }: Props) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden border border-gray-200">
         <div className="flex justify-between items-center p-5 border-b border-gray-200 flex-shrink-0">
-          <h2 className="text-xl font-bold text-gray-900">Submissions: {quiz.title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-          </button>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-bold text-gray-900">Submissions: {quiz.title}</h2>
+            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded ${
+              quiz.status === 'PUBLISHED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+              quiz.status === 'CLOSED' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+              'bg-gray-100 text-gray-600'
+            }`}>
+              {quiz.status}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {quiz.status === 'CLOSED' ? (
+              <button
+                onClick={handleDownloadExcel}
+                disabled={downloading}
+                className="text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
+                title="Download all quiz answers in Excel (.xlsx) format"
+              >
+                <FileSpreadsheet size={15} />
+                {downloading ? "Downloading Excel..." : "Download Excel (.xlsx)"}
+              </button>
+            ) : (
+              <div
+                className="text-xs text-gray-500 bg-gray-100 px-3 py-1.5 rounded-lg border border-gray-200 flex items-center gap-1.5"
+                title="Excel download becomes available once the quiz is closed"
+              >
+                <FileSpreadsheet size={14} className="text-gray-400" />
+                <span>Excel available when closed</span>
+              </div>
+            )}
+
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-6">

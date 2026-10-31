@@ -146,3 +146,34 @@ export const getPdfQuizAnalytics = async (projectId: string, docId: string): Pro
   if (!res.ok) throw new Error(await extractError(res, "Failed to fetch document PDF quiz analytics"));
   return res.json();
 };
+
+export const downloadQuizAnswersExcel = async (
+  projectId: string,
+  quizId: string,
+  quizTitle?: string
+): Promise<void> => {
+  const res = await authFetch(`${API_BASE_URL}/projects/${projectId}/quizzes/${quizId}/export-excel`);
+  if (!res.ok) {
+    const errorMsg = await extractError(res, "Failed to download quiz answers");
+    throw new Error(errorMsg);
+  }
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+
+  const disposition = res.headers.get("content-disposition");
+  let filename = `${(quizTitle || "Quiz").trim().replace(/[^a-zA-Z0-9_-]/g, "_")}_Answers.xlsx`;
+  if (disposition && disposition.includes("filename=")) {
+    const match = disposition.match(/filename="?([^";]+)"?/);
+    if (match && match[1]) {
+      filename = match[1];
+    }
+  }
+
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+};

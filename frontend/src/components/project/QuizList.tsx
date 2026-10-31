@@ -9,7 +9,8 @@ import { QuizTakeModal } from "./QuizTakeModal"
 import { QuizSubmissionsModal } from "./QuizSubmissionsModal"
 import { ManageQuizModal } from "./ManageQuizModal"
 import { QuizAnalyticsModal } from "./QuizAnalyticsModal"
-import { BarChart2 } from "lucide-react"
+import { BarChart2, FileSpreadsheet } from "lucide-react"
+import { downloadQuizAnswersExcel } from "@/lib/api/quizzes"
 
 import { useRouter } from "next/navigation"
 
@@ -46,6 +47,18 @@ function QuizItem({
   const [takeModalOpen, setTakeModalOpen] = useState(false)
   const [submissionsModalOpen, setSubmissionsModalOpen] = useState(false)
   const [manageModalOpen, setManageModalOpen] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+
+  const handleDownloadExcel = async () => {
+    try {
+      setDownloading(true)
+      await downloadQuizAnswersExcel(projectId, quiz.id, quiz.title)
+    } catch (err: any) {
+      alert(err.message || "Failed to download Excel file")
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   const handlePublish = async () => {
     if (window.confirm(`Publish quiz "${quiz.title}"? Project members will be able to take it.`)) {
@@ -142,12 +155,23 @@ function QuizItem({
               </button>
             )}
             {quiz.status === 'CLOSED' && (
-              <button
-                onClick={handleReopen}
-                className="text-xs font-semibold text-emerald-600 hover:text-emerald-800 transition-colors"
-              >
-                Reopen Quiz
-              </button>
+              <>
+                <button
+                  onClick={handleReopen}
+                  className="text-xs font-semibold text-emerald-600 hover:text-emerald-800 transition-colors"
+                >
+                  Reopen Quiz
+                </button>
+                <button
+                  onClick={handleDownloadExcel}
+                  disabled={downloading}
+                  className="text-xs font-semibold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                  title="Download all quiz answers in Excel (.xlsx) format"
+                >
+                  <FileSpreadsheet size={13} />
+                  {downloading ? "Downloading..." : "Download Excel"}
+                </button>
+              </>
             )}
             <button
               onClick={() => setTakeModalOpen(true)}

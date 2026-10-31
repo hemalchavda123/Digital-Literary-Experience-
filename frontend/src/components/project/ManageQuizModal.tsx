@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useProjects } from "@/context/ProjectContext"
 import { QuestionType, Quiz, QuizQuestion } from "@/types/quiz"
-import { getQuizById } from "@/lib/api/quizzes"
+import { getQuizById, downloadQuizAnswersExcel } from "@/lib/api/quizzes"
+import { FileSpreadsheet } from "lucide-react"
 
 interface Props {
   projectId: string
@@ -38,6 +39,18 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
   
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
+  const [downloading, setDownloading] = useState(false)
+
+  const handleDownloadExcel = async () => {
+    try {
+      setDownloading(true)
+      await downloadQuizAnswersExcel(projectId, quizId, title)
+    } catch (err: any) {
+      alert(err.message || "Failed to download Excel file")
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hasLoadedRef = useRef(false)
@@ -336,7 +349,21 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
               {/* Quiz Details */}
               <div className="flex flex-col gap-4 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                 <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-gray-100">
-                  <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Quiz Status:</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Quiz Status:</span>
+                    {status === "CLOSED" && (
+                      <button
+                        type="button"
+                        onClick={handleDownloadExcel}
+                        disabled={downloading}
+                        className="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded font-semibold text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                        title="Download all quiz answers in Excel (.xlsx) format"
+                      >
+                        <FileSpreadsheet size={13} />
+                        {downloading ? "Downloading..." : "Download Excel"}
+                      </button>
+                    )}
+                  </div>
                   <div className="flex items-center bg-gray-100 p-1 rounded-lg border border-gray-200 text-xs gap-1">
                     <button
                       type="button"

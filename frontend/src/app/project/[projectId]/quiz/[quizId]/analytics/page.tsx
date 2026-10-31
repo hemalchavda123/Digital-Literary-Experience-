@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { getQuizAnalytics } from "@/lib/api/quizzes"
+import { getQuizAnalytics, downloadQuizAnswersExcel } from "@/lib/api/quizzes"
 import { getProjectById } from "@/lib/api/projects"
 import type { QuizAnalytics, QuestionBreakdown, ResponseDistributionItem } from "@/types/quiz"
 import Navbar from "@/components/Navbar"
@@ -16,6 +16,7 @@ import {
   HelpCircle,
   Award,
   Check,
+  FileSpreadsheet,
 } from "lucide-react"
 
 // Classic Google Forms response chart color palette
@@ -270,6 +271,19 @@ export default function QuizAnalyticsPage() {
   const [projectName, setProjectName] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [downloading, setDownloading] = useState(false)
+
+  const handleDownloadExcel = async () => {
+    if (!analytics) return
+    try {
+      setDownloading(true)
+      await downloadQuizAnswersExcel(params.projectId as string, params.quizId as string, analytics.title)
+    } catch (err: any) {
+      alert(err.message || "Failed to download Excel file")
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   useEffect(() => {
     async function load() {
@@ -342,6 +356,28 @@ export default function QuizAnalyticsPage() {
                   <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{analytics.title}</h1>
                   {analytics.description && (
                     <p className="text-sm text-gray-600 leading-relaxed pt-1">{analytics.description}</p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 self-start sm:self-auto flex-shrink-0">
+                  {analytics.status === 'CLOSED' ? (
+                    <button
+                      onClick={handleDownloadExcel}
+                      disabled={downloading}
+                      className="text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 rounded-lg flex items-center gap-2 shadow-sm transition-all disabled:opacity-50"
+                      title="Download complete quiz answers data in Excel format"
+                    >
+                      <FileSpreadsheet size={15} />
+                      {downloading ? "Downloading Excel..." : "Download Excel Report"}
+                    </button>
+                  ) : (
+                    <div
+                      className="text-xs text-gray-500 bg-gray-100 px-3 py-1.5 rounded-lg border border-gray-200 flex items-center gap-1.5"
+                      title="Excel answers report becomes available once the quiz is closed"
+                    >
+                      <FileSpreadsheet size={14} className="text-gray-400" />
+                      <span>Excel available when closed</span>
+                    </div>
                   )}
                 </div>
               </div>
