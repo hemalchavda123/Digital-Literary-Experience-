@@ -357,7 +357,8 @@ export default function Signup2(): JSX.Element {
                       Sign up with your Google account.
                     </p>
 
-                    <div style={{ margin: "32px 0 20px", display: 'flex', justifyContent: 'center' }}>
+                    <div style={{ margin: "32px 0 20px", display: 'flex', justifyContent: 'center', minHeight: 44 }}>
+                      {viewIndex === 0 && (
                       <GoogleLogin
                         onSuccess={handleGoogleSuccess}
                         onError={() => {
@@ -370,6 +371,7 @@ export default function Signup2(): JSX.Element {
                         auto_select={false}
                         itp_support={false}
                       />
+                      )}
                     </div>
 
                     <button
@@ -443,7 +445,8 @@ export default function Signup2(): JSX.Element {
                       </button>
                     </form>
 
-                    <div style={{ marginTop: 16, marginBottom: 8, display: 'flex', justifyContent: 'center' }}>
+                    <div style={{ marginTop: 16, marginBottom: 8, display: 'flex', justifyContent: 'center', minHeight: 44 }}>
+                      {viewIndex === 1 && (
                       <GoogleLogin
                         onSuccess={handleGoogleSuccess}
                         onError={() => {
@@ -456,6 +459,7 @@ export default function Signup2(): JSX.Element {
                         auto_select={false}
                         itp_support={false}
                       />
+                      )}
                     </div>
 
                     <button
