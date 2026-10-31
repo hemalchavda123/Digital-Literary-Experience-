@@ -4,6 +4,9 @@ import { useState } from "react"
 import { useProjects } from "@/context/ProjectContext"
 import { QuestionType } from "@/types/quiz"
 import { createQuiz as apiCreateQuiz } from "@/lib/api/quizzes"
+import { AddQuestionsFromTextModal } from "@/components/project/AddQuestionsFromTextModal"
+import { ParsedQuestion } from "@/lib/quizTextParser"
+import { FileText } from "lucide-react"
 
 interface Props {
   projectId: string
@@ -33,6 +36,7 @@ export function CreateQuizModal({ projectId, documentId, annotationId, onClose }
   const [description, setDescription] = useState("")
   const [questions, setQuestions] = useState<TempQuestion[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isTextImportOpen, setIsTextImportOpen] = useState(false)
 
   const handleAddQuestion = () => {
     setQuestions([
@@ -49,11 +53,33 @@ export function CreateQuizModal({ projectId, documentId, annotationId, onClose }
     ])
   }
 
+  const handleAddQuestionsFromText = (parsedQuestions: ParsedQuestion[]) => {
+    const newQuestions: TempQuestion[] = parsedQuestions.map((q) => ({
+      id: ++tempQuestionIdCounter,
+      type: q.type,
+      questionText: q.questionText,
+      options:
+        q.type === "MULTIPLE_CHOICE"
+          ? q.options.length >= 2
+            ? q.options
+            : ["Option 1", "Option 2"]
+          : ["Option 1", "Option 2"],
+      marks: q.marks,
+      correctAnswer: q.correctAnswer,
+      isPublished: q.isPublished,
+    }))
+    setQuestions((prev) => [...prev, ...newQuestions])
+  }
+
   const handleRemoveQuestion = (id: number) => {
     setQuestions(questions.filter((q) => q.id !== id))
   }
 
-  const updateQuestion = (id: number, field: keyof TempQuestion, value: any) => {
+  const updateQuestion = (
+    id: number,
+    field: keyof TempQuestion,
+    value: TempQuestion[keyof TempQuestion]
+  ) => {
     setQuestions(questions.map((q) => (q.id === id ? { ...q, [field]: value } : q)))
   }
 
@@ -161,19 +187,49 @@ export function CreateQuizModal({ projectId, documentId, annotationId, onClose }
 
           {/* Questions */}
           <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <h3 className="text-lg font-bold text-gray-900">Questions</h3>
-              <button
-                onClick={handleAddQuestion}
-                className="px-3 py-1 text-sm border border-gray-300 rounded-md font-medium text-gray-700 hover:bg-gray-50"
-              >
-                + Add Question
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsTextImportOpen(true)}
+                  className="px-3 py-1 text-sm border border-[#a17038] text-[#a17038] hover:bg-[#a17038]/10 rounded-md font-medium transition-colors flex items-center gap-1.5"
+                  title="Add multiple questions directly from text"
+                >
+                  <FileText size={15} />
+                  Add from Text
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddQuestion}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  + Add Question
+                </button>
+              </div>
             </div>
 
             {questions.length === 0 ? (
-              <div className="text-center p-8 bg-gray-50 border border-dashed border-gray-300 rounded-md">
+              <div className="text-center p-8 bg-gray-50 border border-dashed border-gray-300 rounded-md flex flex-col items-center justify-center gap-3">
                 <p className="text-sm text-gray-500">No questions added yet.</p>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleAddQuestion}
+                    className="px-3 py-1.5 text-xs font-semibold border border-gray-300 rounded hover:bg-gray-100 text-gray-700 transition-colors"
+                  >
+                    + Add Question Manually
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsTextImportOpen(true)}
+                    className="px-3 py-1.5 text-xs font-semibold rounded text-white hover:opacity-95 transition-opacity flex items-center gap-1.5 shadow-xs"
+                    style={{ backgroundColor: "#a17038" }}
+                  >
+                    <FileText size={14} />
+                    Add from Direct Text
+                  </button>
+                </div>
               </div>
             ) : (
               <>{questions.map((q, index) => (
@@ -287,19 +343,31 @@ export function CreateQuizModal({ projectId, documentId, annotationId, onClose }
               ))}</>
             )}
             {questions.length > 0 && (
-              <button
-                onClick={handleAddQuestion}
-                className="w-full py-3 text-sm border-2 border-dashed border-gray-300 rounded-md font-medium text-gray-500 hover:border-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                + Add Question
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleAddQuestion}
+                  className="flex-1 py-3 text-sm border-2 border-dashed border-gray-300 rounded-md font-medium text-gray-600 hover:border-gray-400 hover:text-gray-800 hover:bg-gray-50 transition-colors"
+                >
+                  + Add Question Manually
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsTextImportOpen(true)}
+                  className="py-3 px-5 text-sm border-2 border-dashed border-[#a17038]/40 text-[#a17038] rounded-md font-medium hover:border-[#a17038] hover:bg-[#a17038]/5 transition-colors flex items-center justify-center gap-1.5"
+                  title="Add more questions from direct text"
+                >
+                  <FileText size={16} />
+                  + Add via Text
+                </button>
+              </div>
             )}
           </div>
         </div>
 
         <div className="p-5 border-t border-gray-200 flex justify-between items-center bg-gray-50 flex-wrap gap-3">
           <span className="text-xs text-gray-500 italic">
-            Note: "Save as Draft" keeps the quiz hidden from other members until you publish it.
+            Note: &quot;Save as Draft&quot; keeps the quiz hidden from other members until you publish it.
           </span>
           <div className="flex items-center gap-3">
             <button
@@ -327,6 +395,13 @@ export function CreateQuizModal({ projectId, documentId, annotationId, onClose }
           </div>
         </div>
       </div>
+
+      {isTextImportOpen && (
+        <AddQuestionsFromTextModal
+          onClose={() => setIsTextImportOpen(false)}
+          onAddQuestions={handleAddQuestionsFromText}
+        />
+      )}
     </div>
   )
 }
