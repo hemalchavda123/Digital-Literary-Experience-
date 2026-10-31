@@ -366,6 +366,9 @@ export default function Signup2(): JSX.Element {
                         theme="outline"
                         shape="pill"
                         text="signup_with"
+                        useOneTap={false}
+                        auto_select={false}
+                        itp_support={false}
                       />
                     </div>
 
@@ -449,6 +452,9 @@ export default function Signup2(): JSX.Element {
                         theme="outline"
                         shape="pill"
                         text="signin_with"
+                        useOneTap={false}
+                        auto_select={false}
+                        itp_support={false}
                       />
                     </div>
 

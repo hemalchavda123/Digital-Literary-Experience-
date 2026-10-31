@@ -10,6 +10,10 @@ const nextConfig: NextConfig = {
             key: "Cross-Origin-Opener-Policy",
             value: "unsafe-none",
           },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
         ],
       },
     ];
