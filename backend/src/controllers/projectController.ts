@@ -23,6 +23,7 @@ export const getProjects = async (req: Request, res: Response): Promise<void> =>
       orderBy: { updatedAt: 'desc' },
       include: {
         owner: { select: { username: true } },
+        members: { where: { userId } }
       }
     });
 

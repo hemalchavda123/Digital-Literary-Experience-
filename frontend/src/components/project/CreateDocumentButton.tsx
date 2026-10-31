@@ -8,9 +8,12 @@ import { Upload, ChevronDown, Laptop, Cloud } from "lucide-react"
 
 type Props = {
   projectId: string
+  canUpload?: boolean
 }
 
-export function CreateDocumentButton({ projectId }: Props) {
+export function CreateDocumentButton({ projectId, canUpload = true }: Props) {
+  if (!canUpload) return null
+
   const { createPdfDocument } = useProjects()
   const router = useRouter()
   const [isUploading, setIsUploading] = useState(false)

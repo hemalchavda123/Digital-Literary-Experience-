@@ -6,9 +6,10 @@ import { useProjects } from "@/context/ProjectContext"
 
 type Props = {
   documents: Document[]
+  canUpload?: boolean
 }
 
-export function DocumentList({ documents }: Props) {
+export function DocumentList({ documents, canUpload = true }: Props) {
   const { deleteDocument } = useProjects()
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
@@ -21,7 +22,11 @@ export function DocumentList({ documents }: Props) {
   }
 
   if (!documents.length) {
-    return <p className="text-sm text-gray-900 mt-4">No documents yet. Create a document to begin writing.</p>
+    return (
+      <p className="text-sm text-gray-900 mt-4">
+        {canUpload ? "No documents yet. Create a document to begin writing." : "No documents yet in this project."}
+      </p>
+    )
   }
 
   return (
@@ -37,13 +42,15 @@ export function DocumentList({ documents }: Props) {
              {/* <div className="text-xs text-gray-900 truncate">{doc.content || "Empty document"}</div> */}
             </Link>
           </div>
-          <button
-            type="button"
-            onClick={(e) => handleDelete(e, doc.id)}
-            className="ml-4 rounded-md border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors"
-          >
-            Delete
-          </button>
+          {canUpload && (
+            <button
+              type="button"
+              onClick={(e) => handleDelete(e, doc.id)}
+              className="ml-4 rounded-md border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors"
+            >
+              Delete
+            </button>
+          )}
         </div>
       ))}
     </div>

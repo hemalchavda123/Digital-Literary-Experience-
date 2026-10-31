@@ -11,6 +11,8 @@ import { AssignmentList } from "@/components/project/AssignmentList"
 import { QuizList } from "@/components/project/QuizList"
 import { useState, useEffect } from "react"
 import { getCurrentUser } from "@/lib/api/authFetch"
+import { getProjectMembers } from "@/lib/api/projects"
+import type { Role, ProjectMember } from "@/types/project"
 
 export default function ProjectPage() {
   const params = useParams<{ projectId: string }>()
@@ -27,6 +29,7 @@ export default function ProjectPage() {
   const [activeTab, setActiveTab] = useState<"documents" | "announcements" | "assignments" | "quizzes">("documents")
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
   const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null)
+  const [memberRole, setMemberRole] = useState<Role | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
 
@@ -69,6 +72,46 @@ export default function ProjectPage() {
   useEffect(() => {
     if (project) setName(project.name)
   }, [project])
+
+  // Resolve current user's role in the project
+  useEffect(() => {
+    if (!projectId || !currentUser?.id) return
+
+    if (project?.ownerId === currentUser.id) {
+      setMemberRole("OWNER")
+      return
+    }
+
+    const myMember = project?.members?.find((m) => m.userId === currentUser.id)
+    if (myMember?.role) {
+      setMemberRole(myMember.role)
+      return
+    }
+
+    let isMounted = true
+    getProjectMembers(projectId)
+      .then((members: ProjectMember[]) => {
+        if (!isMounted) return
+        const me = members?.find((m) => m.userId === currentUser.id)
+        if (me?.role) {
+          setMemberRole(me.role)
+        } else {
+          setMemberRole("VIEWER")
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load project members for role check:", err)
+        if (isMounted) setMemberRole("VIEWER")
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [projectId, currentUser?.id, project?.ownerId, project?.members])
+
+  const isOwner = Boolean(currentUser?.id && project?.ownerId && currentUser.id === project.ownerId)
+  const isEditor = memberRole === "EDITOR" || Boolean(project?.members?.some((m) => m.userId === currentUser?.id && m.role === "EDITOR"))
+  const canUploadDocument = isOwner || isEditor
 
   if (!authChecked) {
     return (
@@ -117,6 +160,7 @@ export default function ProjectPage() {
   }
 
   const handleRenameBlur = async () => {
+    if (!isOwner) return
     if (name.trim() && name.trim() !== project.name) {
       await renameProject(project.id, name.trim())
     } else {
@@ -125,6 +169,7 @@ export default function ProjectPage() {
   }
 
   const handleDelete = async () => {
+    if (!isOwner) return
     const confirmed = window.confirm("Delete this project and all its documents?")
     if (!confirmed) return
     await deleteProject(project.id)
@@ -140,12 +185,15 @@ export default function ProjectPage() {
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => isOwner && setName(e.target.value)}
               onBlur={handleRenameBlur}
-              className="flex-1 border-none bg-transparent text-2xl font-semibold text-gray-900 placeholder-gray-500 focus:outline-none"
+              readOnly={!isOwner}
+              className={`flex-1 border-none bg-transparent text-2xl font-semibold text-gray-900 placeholder-gray-500 focus:outline-none ${
+                !isOwner ? "cursor-default" : ""
+              }`}
             />
             <div className="flex gap-2">
-              {currentUser?.id === project.ownerId && (
+              {isOwner && (
                 <button
                   type="button"
                   onClick={() => setIsShareModalOpen(true)}
@@ -154,7 +202,7 @@ export default function ProjectPage() {
                   Share
                 </button>
               )}
-              {currentUser?.id === project.ownerId && (
+              {isOwner && (
                 <button
                   type="button"
                   onClick={() => setIsShareModalOpen(true)}
@@ -163,7 +211,7 @@ export default function ProjectPage() {
                   Permissions
                 </button>
               )}
-              {currentUser?.id === project.ownerId && (
+              {isOwner && (
                 <button
                   type="button"
                   onClick={handleDelete}
@@ -223,20 +271,22 @@ export default function ProjectPage() {
           <div className="mt-6">
             {activeTab === "documents" && (
               <>
-                <div className="flex flex-wrap items-center gap-3 mb-6">
-                  <CreateDocumentButton projectId={project.id} />
-                </div>
-                <DocumentList documents={docs} />
+                {canUploadDocument && (
+                  <div className="flex flex-wrap items-center gap-3 mb-6">
+                    <CreateDocumentButton projectId={project.id} canUpload={canUploadDocument} />
+                  </div>
+                )}
+                <DocumentList documents={docs} canUpload={canUploadDocument} />
               </>
             )}
             {activeTab === "announcements" && (
-              <AnnouncementList projectId={project.id} isOwner={currentUser?.id === project.ownerId} currentUserId={currentUser?.id} />
+              <AnnouncementList projectId={project.id} isOwner={isOwner} currentUserId={currentUser?.id} />
             )}
             {activeTab === "assignments" && (
-              <AssignmentList projectId={project.id} isOwner={currentUser?.id === project.ownerId} currentUserId={currentUser?.id} />
+              <AssignmentList projectId={project.id} isOwner={isOwner} currentUserId={currentUser?.id} />
             )}
             {activeTab === "quizzes" && (
-              <QuizList projectId={project.id} isOwner={currentUser?.id === project.ownerId} currentUserId={currentUser?.id} />
+              <QuizList projectId={project.id} isOwner={isOwner} currentUserId={currentUser?.id} />
             )}
           </div>
         </div>
@@ -245,7 +295,7 @@ export default function ProjectPage() {
         isOpen={isShareModalOpen} 
         onClose={() => setIsShareModalOpen(false)} 
         projectId={project.id}
-        isOwner={currentUser?.id === project.ownerId}
+        isOwner={isOwner}
       />
     </div>
   )
