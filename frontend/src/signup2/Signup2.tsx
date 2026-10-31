@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, JSX } from "react"
 import { useRouter } from "next/navigation"
-import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google'
+import { GoogleLogin } from '@react-oauth/google'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 
@@ -266,7 +266,7 @@ export default function Signup2(): JSX.Element {
   )
 
   return (
-    <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID"}>
+
       <div
         style={{
           height: "100vh",
@@ -561,6 +561,6 @@ export default function Signup2(): JSX.Element {
         )}
       </div>
     </div>
-    </GoogleOAuthProvider>
+
   )
 }
