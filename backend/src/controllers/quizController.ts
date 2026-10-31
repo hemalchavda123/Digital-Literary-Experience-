@@ -1092,7 +1092,7 @@ export const exportQuizAnswersExcel = async (req: Request, res: Response, next: 
     const sheet1HeaderRowIndex = 6;
     const s1HeaderRow = sheet1.getRow(sheet1HeaderRowIndex);
     s1HeaderRow.height = 26;
-    s1HeaderRow.eachCell((cell) => {
+    s1HeaderRow.eachCell((cell: ExcelJS.Cell) => {
       cell.fill = headerFill;
       cell.font = headerFont;
       cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
@@ -1129,7 +1129,7 @@ export const exportQuizAnswersExcel = async (req: Request, res: Response, next: 
       const dataRow = sheet1.addRow(rowValues);
       dataRow.height = 20;
 
-      dataRow.eachCell((cell, colNumber) => {
+      dataRow.eachCell((cell: ExcelJS.Cell, colNumber: number) => {
         cell.border = borderStyle;
         cell.alignment = { vertical: 'middle' };
 
@@ -1177,7 +1177,7 @@ export const exportQuizAnswersExcel = async (req: Request, res: Response, next: 
     sheet2.addRow(sheet2Headers);
     const s2HeaderRow = sheet2.getRow(1);
     s2HeaderRow.height = 26;
-    s2HeaderRow.eachCell((cell) => {
+    s2HeaderRow.eachCell((cell: ExcelJS.Cell) => {
       cell.fill = headerFill;
       cell.font = headerFont;
       cell.alignment = { vertical: 'middle', horizontal: 'center' };
@@ -1211,7 +1211,7 @@ export const exportQuizAnswersExcel = async (req: Request, res: Response, next: 
         ]);
         row.height = 20;
 
-        row.eachCell((cell, colNumber) => {
+        row.eachCell((cell: ExcelJS.Cell, colNumber: number) => {
           cell.border = borderStyle;
           cell.alignment = { vertical: 'middle' };
 
@@ -1255,7 +1255,7 @@ export const exportQuizAnswersExcel = async (req: Request, res: Response, next: 
     sheet3.addRow(sheet3Headers);
     const s3HeaderRow = sheet3.getRow(1);
     s3HeaderRow.height = 26;
-    s3HeaderRow.eachCell((cell) => {
+    s3HeaderRow.eachCell((cell: ExcelJS.Cell) => {
       cell.fill = headerFill;
       cell.font = headerFont;
       cell.alignment = { vertical: 'middle', horizontal: 'center' };
@@ -1295,7 +1295,7 @@ export const exportQuizAnswersExcel = async (req: Request, res: Response, next: 
       ]);
       row.height = 20;
 
-      row.eachCell((cell, colNumber) => {
+      row.eachCell((cell: ExcelJS.Cell, colNumber: number) => {
         cell.border = borderStyle;
         cell.alignment = { vertical: 'middle' };
         if ([1, 2, 5, 6, 7, 8, 9, 10].includes(colNumber)) {
@@ -1308,9 +1308,9 @@ export const exportQuizAnswersExcel = async (req: Request, res: Response, next: 
 
     // Auto-fit column widths across all sheets
     [sheet1, sheet2, sheet3].forEach((sheet) => {
-      sheet.columns.forEach((col) => {
+      sheet.columns.forEach((col: Partial<ExcelJS.Column>) => {
         let maxLen = 10;
-        col.eachCell?.({ includeEmpty: false }, (cell) => {
+        col.eachCell?.({ includeEmpty: false }, (cell: ExcelJS.Cell) => {
           const val = cell.value ? String(cell.value) : '';
           const len = Math.min(val.length, 40);
           if (len > maxLen) maxLen = len;
