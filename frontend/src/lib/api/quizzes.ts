@@ -204,6 +204,7 @@ export const getStudentPerformanceTracker = async (
   username: string;
   email?: string;
   totalQuizzesTaken: number;
+  totalQuizzesInProject?: number;
   averageScorePercentage: number;
   highestScorePercentage: number;
   quizzes: {
@@ -217,7 +218,8 @@ export const getStudentPerformanceTracker = async (
     totalParticipants: number;
   }[];
 }> => {
-  const qStr = userId ? `?userId=${encodeURIComponent(userId)}` : '';
+  const validUserId = userId && userId !== 'undefined' && userId !== 'null' ? userId : undefined;
+  const qStr = validUserId ? `?userId=${encodeURIComponent(validUserId)}` : '';
   const res = await authFetch(`${API_BASE_URL}/projects/${projectId}/quizzes/performance${qStr}`);
   if (!res.ok) throw new Error(await extractError(res, "Failed to fetch performance tracker"));
   return res.json();

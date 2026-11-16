@@ -160,6 +160,7 @@ export interface StudentQuizPerformance {
   username: string;
   email?: string;
   totalQuizzesTaken: number;
+  totalQuizzesInProject?: number;
   averageScorePercentage: number;
   highestScorePercentage: number;
   quizzes: {

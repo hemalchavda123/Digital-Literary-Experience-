@@ -857,7 +857,11 @@ export const getStudentPerformanceTracker = async (req: Request, res: Response, 
   try {
     const projectId = req.params.projectId as string;
     const userId = (req as any).user?.userId;
-    const targetUserId = (req.query.userId as string) || userId;
+    const rawTargetUserId = req.query.userId as string | undefined;
+    const targetUserId =
+      rawTargetUserId && rawTargetUserId !== 'undefined' && rawTargetUserId !== 'null'
+        ? rawTargetUserId
+        : userId;
 
     const { isOwner, isMember } = await checkProjectAccess(projectId, userId);
     if (!isMember) {
@@ -887,10 +891,12 @@ export const getStudentPerformanceTracker = async (req: Request, res: Response, 
       orderBy: { createdAt: 'asc' },
     });
 
-    const targetUser = await prisma.user.findUnique({
-      where: { id: targetUserId },
-      select: { id: true, username: true, email: true },
-    });
+    const targetUser = targetUserId
+      ? await prisma.user.findUnique({
+          where: { id: targetUserId },
+          select: { id: true, username: true, email: true },
+        })
+      : null;
 
     const performanceRecords: any[] = [];
 
@@ -926,9 +932,10 @@ export const getStudentPerformanceTracker = async (req: Request, res: Response, 
 
     res.json({
       userId: targetUserId,
-      username: targetUser?.username || 'Unknown',
+      username: targetUser?.username || (targetUserId === userId ? (req as any).user?.username : 'Student'),
       email: isOwner ? targetUser?.email : undefined,
       totalQuizzesTaken,
+      totalQuizzesInProject: quizzes.length,
       averageScorePercentage,
       highestScorePercentage,
       quizzes: performanceRecords,

@@ -4,7 +4,8 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { useProjects } from "@/context/ProjectContext"
 import { QuestionType, AnswerRevealMode, PartialMarkingRule } from "@/types/quiz"
 import { getQuizById, downloadQuizAnswersExcel } from "@/lib/api/quizzes"
-import { FileSpreadsheet, FileText, Trophy, Eye, ShieldAlert } from "lucide-react"
+import { FileSpreadsheet, FileText, Trophy, Eye, ShieldAlert, HelpCircle } from "lucide-react"
+import { MarkingSchemeGuideModal } from "@/components/project/MarkingSchemeGuideModal"
 import { AddQuestionsFromTextModal } from "@/components/project/AddQuestionsFromTextModal"
 import { ParsedQuestion } from "@/lib/quizTextParser"
 
@@ -48,6 +49,7 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
   const [downloading, setDownloading] = useState(false)
   const [isTextImportOpen, setIsTextImportOpen] = useState(false)
+  const [markingGuideOpen, setMarkingGuideOpen] = useState(false)
 
   const handleDownloadExcel = async () => {
     try {
@@ -501,7 +503,18 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
               {/* Questions */}
               <div className="flex flex-col gap-4 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
-                  <h3 className="text-lg font-bold text-gray-900">Questions</h3>
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-lg font-bold text-gray-900">Questions</h3>
+                    <button
+                      type="button"
+                      onClick={() => setMarkingGuideOpen(true)}
+                      className="px-2.5 py-1 text-xs border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-lg font-semibold transition-colors flex items-center gap-1 shadow-2xs"
+                      title="View Marking Schemes Guide"
+                    >
+                      <HelpCircle size={13} className="text-amber-700" />
+                      Marking Guide
+                    </button>
+                  </div>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
@@ -619,6 +632,14 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
                               </div>
                             )}
                           </div>
+
+                          {q.type === "MULTIPLE_CORRECT" && (
+                            <p className="text-[11px] text-gray-500 italic ml-9">
+                              {q.partialMarkingRule === "PROPORTIONAL_WITH_PENALTY" && "• Proportional: Correct selections add partial credit; incorrect selections deduct partial credit (floor at 0)."}
+                              {q.partialMarkingRule === "POSITIVE_ONLY" && "• Positive Only: Correct selections add partial credit without deductions for incorrect picks."}
+                              {q.partialMarkingRule === "NONE" && "• All or Nothing: Must select all correct and no incorrect choices to receive marks."}
+                            </p>
+                          )}
 
                           <input
                             type="text"
@@ -891,6 +912,12 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
         <AddQuestionsFromTextModal
           onClose={() => setIsTextImportOpen(false)}
           onAddQuestions={handleAddQuestionsFromText}
+        />
+      )}
+
+      {markingGuideOpen && (
+        <MarkingSchemeGuideModal
+          onClose={() => setMarkingGuideOpen(false)}
         />
       )}
     </div>

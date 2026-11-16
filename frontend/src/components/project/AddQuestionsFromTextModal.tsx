@@ -35,7 +35,7 @@ export function AddQuestionsFromTextModal({ onClose, onAddQuestions }: Props) {
 
   const { questions, summary, warnings } = parseResult
 
-  const handleApplyTemplate = (type: "mixed" | "mcq" | "oneWord" | "shortAnswer") => {
+  const handleApplyTemplate = (type: "mixed" | "mcq" | "oneWord" | "shortAnswer" | "multiCorrect") => {
     setRawText(SAMPLE_QUIZ_TEMPLATES[type])
   }
 
@@ -98,6 +98,13 @@ export function AddQuestionsFromTextModal({ onClose, onAddQuestions }: Props) {
             </button>
             <button
               type="button"
+              onClick={() => handleApplyTemplate("multiCorrect")}
+              className="px-2.5 py-1 bg-white border border-gray-300 hover:border-gray-400 rounded text-purple-700 font-medium transition-colors shadow-2xs"
+            >
+              Multiple Correct
+            </button>
+            <button
+              type="button"
               onClick={() => handleApplyTemplate("oneWord")}
               className="px-2.5 py-1 bg-white border border-gray-300 hover:border-gray-400 rounded text-gray-700 font-medium transition-colors shadow-2xs"
             >
@@ -128,21 +135,21 @@ export function AddQuestionsFromTextModal({ onClose, onAddQuestions }: Props) {
             className="flex items-center gap-1 text-[#a17038] hover:text-[#8a5f2e] font-semibold underline underline-offset-2"
           >
             <HelpCircle size={13} />
-            {showCheatsheet ? "Hide Format Guide" : "Format Cheatsheet"}
+            {showCheatsheet ? "Hide Format Guide" : "Format & Marking Cheatsheet"}
             {showCheatsheet ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
           </button>
         </div>
 
         {/* Collapsible Format Cheatsheet */}
         {showCheatsheet && (
-          <div className="bg-amber-50/70 border-b border-amber-200 p-4 text-xs text-gray-800 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-amber-50/70 border-b border-amber-200 p-4 text-xs text-gray-800 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-white p-3 rounded border border-amber-200 shadow-2xs">
               <h4 className="font-bold text-amber-900 mb-1 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-purple-500"></span>
-                Multiple Choice (MCQ)
+                Single Choice (MCQ)
               </h4>
-              <p className="text-gray-600 mb-2">Include options with A, B, C, D. Mark answer with an asterisk (*) or Answer line:</p>
-              <pre className="bg-gray-50 p-2 rounded text-[11px] font-mono text-gray-800 overflow-x-auto border border-gray-200">
+              <p className="text-gray-600 mb-2 text-[11px]">Mark single answer with asterisk (*) or Answer line:</p>
+              <pre className="bg-gray-50 p-2 rounded text-[10px] font-mono text-gray-800 overflow-x-auto border border-gray-200">
 {`1. Capital of France?
 A) Berlin
 B) Madrid
@@ -153,13 +160,29 @@ Marks: 2`}
             </div>
 
             <div className="bg-white p-3 rounded border border-amber-200 shadow-2xs">
-              <h4 className="font-bold text-amber-900 mb-1 flex items-center gap-1.5">
+              <h4 className="font-bold text-purple-900 mb-1 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+                Multiple Correct
+              </h4>
+              <p className="text-gray-600 mb-2 text-[11px]">Mark several asterisks or list Answers comma-separated:</p>
+              <pre className="bg-gray-50 p-2 rounded text-[10px] font-mono text-gray-800 overflow-x-auto border border-gray-200">
+{`2. Select prime numbers:
+*A) 2
+B) 4
+*C) 7
+D) 9
+Marks: 3`}
+              </pre>
+            </div>
+
+            <div className="bg-white p-3 rounded border border-amber-200 shadow-2xs">
+              <h4 className="font-bold text-blue-900 mb-1 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-blue-500"></span>
                 One Word
               </h4>
-              <p className="text-gray-600 mb-2">Specify <code>Type: One Word</code> or write fill-in-the-blank style with Answer line:</p>
-              <pre className="bg-gray-50 p-2 rounded text-[11px] font-mono text-gray-800 overflow-x-auto border border-gray-200">
-{`2. Powerhouse of the cell?
+              <p className="text-gray-600 mb-2 text-[11px]">Specify <code>Type: One Word</code> with single answer:</p>
+              <pre className="bg-gray-50 p-2 rounded text-[10px] font-mono text-gray-800 overflow-x-auto border border-gray-200">
+{`3. Powerhouse of cell?
 Type: One Word
 Answer: Mitochondria
 Marks: 1`}
@@ -167,15 +190,15 @@ Marks: 1`}
             </div>
 
             <div className="bg-white p-3 rounded border border-amber-200 shadow-2xs">
-              <h4 className="font-bold text-amber-900 mb-1 flex items-center gap-1.5">
+              <h4 className="font-bold text-emerald-900 mb-1 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                 Short Answer
               </h4>
-              <p className="text-gray-600 mb-2">Open-ended questions. Optionally provide reference answer and marks:</p>
-              <pre className="bg-gray-50 p-2 rounded text-[11px] font-mono text-gray-800 overflow-x-auto border border-gray-200">
-{`3. Explain photosynthesis.
+              <p className="text-gray-600 mb-2 text-[11px]">Open-ended. Optionally add reference model answer:</p>
+              <pre className="bg-gray-50 p-2 rounded text-[10px] font-mono text-gray-800 overflow-x-auto border border-gray-200">
+{`4. Explain photosynthesis.
 Type: Short Answer
-Marks: 3
+Marks: 5
 Answer: Plants convert light...`}
               </pre>
             </div>

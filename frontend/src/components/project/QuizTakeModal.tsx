@@ -18,9 +18,11 @@ import {
   Square,
   MinusCircle,
   Info,
+  Scale,
 } from "lucide-react"
 import { QuizLeaderboardModal } from "./QuizLeaderboardModal"
 import { StudentPerformanceModal } from "./StudentPerformanceModal"
+import { MarkingSchemeGuideModal } from "./MarkingSchemeGuideModal"
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 const getAlphabetLabel = (index: number) => ALPHABET[index] || ""
@@ -47,6 +49,7 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
   const [activeStudents, setActiveStudents] = useState<number>(1)
   const [leaderboardOpen, setLeaderboardOpen] = useState(false)
   const [performanceOpen, setPerformanceOpen] = useState(false)
+  const [markingGuideOpen, setMarkingGuideOpen] = useState(false)
   const [shouldRevealAnswers, setShouldRevealAnswers] = useState(false)
   const [showLeaderboard, setShowLeaderboard] = useState<boolean>(initialQuiz.showLeaderboard ?? true)
 
@@ -356,6 +359,17 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
               <span>My Stats</span>
             </button>
 
+            {/* Marking Scheme Guide Button */}
+            <button
+              type="button"
+              onClick={() => setMarkingGuideOpen(true)}
+              className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 px-3 py-1.5 rounded-lg transition-colors shadow-xs"
+              title="View how questions and partial marking are calculated"
+            >
+              <Scale size={13} className="text-gray-600" />
+              <span>Marking Rules</span>
+            </button>
+
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 p-1.5 hover:bg-gray-200/60 rounded-lg transition-colors"
@@ -571,16 +585,27 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
                         )}
 
                         {/* Negative marking or partial marking disclosure */}
-                        <div className="flex items-center gap-2 pt-1 text-[11px] text-gray-500">
+                        <div className="flex items-center gap-2 pt-1 text-[11px] text-gray-500 flex-wrap">
                           {q.type === "MULTIPLE_CORRECT" && (
-                            <span className="bg-gray-100 px-2 py-0.5 rounded">
-                              Multiple Correct ({q.partialMarkingRule?.replace(/_/g, " ").toLowerCase() || "proportional"})
-                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setMarkingGuideOpen(true)}
+                              className="bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 px-2 py-0.5 rounded flex items-center gap-1 transition-colors font-medium"
+                              title="Click to view marking rule explanation"
+                            >
+                              <Scale size={11} />
+                              Multiple Correct ({q.partialMarkingRule ? q.partialMarkingRule.replace(/_/g, " ").toLowerCase() : "proportional"})
+                            </button>
                           )}
                           {(q.negativeMarks ?? 0) > 0 && (
-                            <span className="text-rose-600 font-medium">
-                              Penalty rule: -{q.negativeMarks} marks on incorrect
-                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setMarkingGuideOpen(true)}
+                              className="text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded flex items-center gap-1 transition-colors font-medium"
+                              title="Click to view penalty details"
+                            >
+                              <MinusCircle size={10} /> Penalty rule: -{q.negativeMarks} marks on incorrect
+                            </button>
                           )}
                         </div>
                       </div>
@@ -632,6 +657,23 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
                 <p className="text-gray-700 text-sm whitespace-pre-wrap leading-relaxed">{quiz.description}</p>
               )}
 
+              {/* Marking Scheme Active Reminder Banner */}
+              <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-3 flex items-center justify-between gap-3 text-xs text-amber-950">
+                <div className="flex items-center gap-2">
+                  <Scale size={15} className="text-amber-700 flex-shrink-0" />
+                  <span>
+                    <strong>Marking Scheme Active:</strong> Check question marks, penalties, and partial credit rules below.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMarkingGuideOpen(true)}
+                  className="text-xs font-bold text-amber-900 underline hover:text-black flex-shrink-0"
+                >
+                  View Rules Guide
+                </button>
+              </div>
+
               <div className="flex flex-col gap-8 mt-2">
                 {quiz.questions && quiz.questions.length > 0 ? (
                   quiz.questions.map((q: QuizQuestion, index: number) => {
@@ -662,14 +704,31 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
                                   {q.marks} {q.marks === 1 ? "mark" : "marks"}
                                 </span>
                                 {q.type === "MULTIPLE_CORRECT" && (
-                                  <span className="text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded">
-                                    Multiple Correct Options
-                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setMarkingGuideOpen(true)}
+                                    className="text-[11px] font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded flex items-center gap-1 cursor-pointer transition-colors"
+                                    title="Click to view marking rule explanation"
+                                  >
+                                    <Scale size={10} className="text-purple-600" />
+                                    <span>
+                                      {q.partialMarkingRule === "POSITIVE_ONLY"
+                                        ? "Positive Partial (No penalty)"
+                                        : q.partialMarkingRule === "NONE"
+                                        ? "All or Nothing"
+                                        : "Proportional with Penalty"}
+                                    </span>
+                                  </button>
                                 )}
                                 {(q.negativeMarks ?? 0) > 0 && (
-                                  <span className="text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setMarkingGuideOpen(true)}
+                                    className="text-[11px] font-bold text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded flex items-center gap-1 cursor-pointer transition-colors"
+                                    title="Click to view penalty details"
+                                  >
                                     <MinusCircle size={10} /> -{q.negativeMarks} penalty
-                                  </span>
+                                  </button>
                                 )}
                                 {isLocked && (
                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-gray-200 text-gray-700">
@@ -901,6 +960,13 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
         <StudentPerformanceModal
           projectId={projectId}
           onClose={() => setPerformanceOpen(false)}
+        />
+      )}
+
+      {/* Marking Scheme Guide Modal Portal */}
+      {markingGuideOpen && (
+        <MarkingSchemeGuideModal
+          onClose={() => setMarkingGuideOpen(false)}
         />
       )}
     </div>

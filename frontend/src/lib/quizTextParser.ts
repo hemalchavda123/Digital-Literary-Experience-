@@ -536,4 +536,19 @@ Marks: 3
 3. What are the key differences between renewable and non-renewable energy?
 Type: Short Answer
 Marks: 4`,
+
+  multiCorrect: `1. Select all prime numbers from the list below:
+A) 2
+B) 4
+C) 7
+D) 9
+Answers: A, C
+Marks: 2
+
+2. Which of the following are operating systems?
+*A) Linux
+B) HTML
+*C) macOS
+*D) Windows
+Marks: 3`,
 }

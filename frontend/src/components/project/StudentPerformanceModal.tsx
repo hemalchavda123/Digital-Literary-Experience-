@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { getStudentPerformanceTracker } from "@/lib/api/quizzes"
 import { StudentQuizPerformance } from "@/types/quiz"
-import { LineChart, TrendingUp, Award, CheckCircle2, Calendar, X, BarChart2, Users } from "lucide-react"
+import { LineChart, TrendingUp, Award, Calendar, X, BarChart2, BookOpen, Clock } from "lucide-react"
 
 interface Props {
   projectId: string
@@ -19,7 +19,8 @@ export function StudentPerformanceModal({ projectId, userId, studentName, onClos
 
   useEffect(() => {
     setLoading(true)
-    getStudentPerformanceTracker(projectId, userId)
+    const validUserId = userId && userId !== "undefined" && userId !== "null" ? userId : undefined
+    getStudentPerformanceTracker(projectId, validUserId)
       .then((res: any) => {
         setData(res)
         setError(null)
@@ -43,7 +44,7 @@ export function StudentPerformanceModal({ projectId, userId, studentName, onClos
     const x =
       quizzes.length === 1
         ? chartWidth / 2
-        : padding + (i / (quizzes.length - 1)) * (chartWidth - padding * 2)
+        : padding + (i / Math.max(quizzes.length - 1, 1)) * (chartWidth - padding * 2)
     const y = chartHeight - padding - (q.percentage / 100) * (chartHeight - padding * 2)
     return { x, y, percentage: q.percentage, title: q.quizTitle }
   })
@@ -57,6 +58,9 @@ export function StudentPerformanceModal({ projectId, userId, studentName, onClos
     points.length > 1
       ? `${pathD} L ${points[points.length - 1].x} ${chartHeight - padding} L ${points[0].x} ${chartHeight - padding} Z`
       : ""
+
+  const totalTaken = data?.totalQuizzesTaken || 0
+  const totalInProject = data?.totalQuizzesInProject
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
@@ -89,9 +93,9 @@ export function StudentPerformanceModal({ projectId, userId, studentName, onClos
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-6">
+        <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-5">
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-2">
+            <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-2">
               <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin" />
               <span className="text-xs font-medium">Computing performance trajectory...</span>
             </div>
@@ -99,55 +103,73 @@ export function StudentPerformanceModal({ projectId, userId, studentName, onClos
             <div className="p-6 text-center text-sm text-gray-600 bg-gray-50 rounded-xl border border-gray-200">
               {error}
             </div>
-          ) : quizzes.length === 0 ? (
-            <div className="p-10 text-center text-sm text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-300 flex flex-col items-center gap-2">
-              <LineChart size={32} className="text-gray-300" />
-              <p className="font-medium">No quiz attempts recorded yet.</p>
-              <p className="text-xs text-gray-400">Complete quizzes to visualize scores and trends over time.</p>
-            </div>
           ) : (
             <>
-              {/* Stat Cards */}
+              {/* Stat Cards - Always Visible */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="bg-indigo-50/60 border border-indigo-100 rounded-xl p-3.5 flex flex-col items-center justify-center text-center">
+                <div className="bg-indigo-50/60 border border-indigo-100 rounded-xl p-4 flex flex-col items-center justify-center text-center">
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-indigo-600 mb-1">
                     Quizzes Completed
                   </span>
-                  <span className="text-3xl font-black text-indigo-950">{data?.totalQuizzesTaken || 0}</span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-black text-indigo-950">{totalTaken}</span>
+                    {totalInProject !== undefined && totalInProject > 0 && (
+                      <span className="text-xs font-medium text-indigo-700/70">
+                        / {totalInProject}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-indigo-600/80 mt-0.5">
+                    {totalInProject !== undefined && totalInProject > 0
+                      ? `${Math.round((totalTaken / totalInProject) * 100)}% project completion`
+                      : totalTaken === 0
+                      ? "No quizzes attempted yet"
+                      : "quizzes completed"}
+                  </span>
                 </div>
 
-                <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-3.5 flex flex-col items-center justify-center text-center">
+                <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-4 flex flex-col items-center justify-center text-center">
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600 mb-1">
                     Average Score
                   </span>
                   <span className="text-3xl font-black text-emerald-950">
-                    {data?.averageScorePercentage || 0}%
+                    {totalTaken > 0 ? `${data?.averageScorePercentage || 0}%` : "—"}
+                  </span>
+                  <span className="text-[10px] text-emerald-600/80 mt-0.5">
+                    {totalTaken > 0 ? "Overall accuracy rate" : "Awaiting first submission"}
                   </span>
                 </div>
 
-                <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-3.5 flex flex-col items-center justify-center text-center">
+                <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-4 flex flex-col items-center justify-center text-center">
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-700 mb-1">
                     Highest Achieved
                   </span>
                   <span className="text-3xl font-black text-amber-950">
-                    {data?.highestScorePercentage || 0}%
+                    {totalTaken > 0 ? `${data?.highestScorePercentage || 0}%` : "—"}
+                  </span>
+                  <span className="text-[10px] text-amber-700/80 mt-0.5">
+                    {totalTaken > 0 ? "Personal best score" : "Awaiting first submission"}
                   </span>
                 </div>
               </div>
 
-              {/* Progress Trajectory Graph */}
-              {quizzes.length > 1 && (
-                <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-bold uppercase tracking-wider text-gray-700 flex items-center gap-1.5">
-                      <BarChart2 size={14} className="text-indigo-600" />
-                      Score Trajectory Over Time
-                    </span>
-                    <span className="text-[11px] text-gray-400 font-medium">
-                      {quizzes.length} quizzes chronologically
-                    </span>
-                  </div>
+              {/* Progress Trajectory Graph Card */}
+              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-bold uppercase tracking-wider text-gray-700 flex items-center gap-1.5">
+                    <BarChart2 size={14} className="text-indigo-600" />
+                    Score Trajectory Over Time
+                  </span>
+                  <span className="text-[11px] text-gray-400 font-medium">
+                    {quizzes.length === 0
+                      ? "No data yet"
+                      : quizzes.length === 1
+                      ? "1 quiz recorded"
+                      : `${quizzes.length} quizzes chronologically`}
+                  </span>
+                </div>
 
+                {quizzes.length > 1 ? (
                   <div className="w-full overflow-x-auto flex justify-center">
                     <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full max-w-lg h-40">
                       {/* Grid lines */}
@@ -204,8 +226,50 @@ export function StudentPerformanceModal({ projectId, userId, studentName, onClos
                       ))}
                     </svg>
                   </div>
-                </div>
-              )}
+                ) : quizzes.length === 1 ? (
+                  <div className="flex flex-col items-center justify-center py-4">
+                    <svg viewBox={`0 0 ${chartWidth} 100`} className="w-full max-w-lg h-24">
+                      {[0, 50, 100].map((pct) => {
+                        const y = 80 - (pct / 100) * 60
+                        return (
+                          <g key={pct}>
+                            <line x1={padding} y1={y} x2={chartWidth - padding} y2={y} stroke="#f1f5f9" strokeWidth="1" />
+                            <text x={padding - 6} y={y + 3} fontSize="9" textAnchor="end" fill="#94a3b8">
+                              {pct}%
+                            </text>
+                          </g>
+                        )
+                      })}
+                      {/* Single Point */}
+                      <circle
+                        cx={chartWidth / 2}
+                        cy={80 - (quizzes[0].percentage / 100) * 60}
+                        r="6"
+                        fill="#4f46e5"
+                        stroke="#ffffff"
+                        strokeWidth="2"
+                      />
+                    </svg>
+                    <p className="text-xs text-gray-600 font-medium text-center mt-1">
+                      1 attempt recorded: <strong className="text-gray-900">{quizzes[0].quizTitle}</strong> ({quizzes[0].percentage}%)
+                    </p>
+                    <p className="text-[11px] text-gray-400 text-center">
+                      Complete at least one more quiz to plot your score trajectory curve over time.
+                    </p>
+                  </div>
+                ) : (
+                  // Zero quizzes attempted - Empty Chart State
+                  <div className="flex flex-col items-center justify-center py-10 px-4 text-center bg-gray-50/60 rounded-lg border border-dashed border-gray-200">
+                    <div className="w-12 h-12 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-500 mb-2.5 shadow-2xs">
+                      <LineChart size={24} />
+                    </div>
+                    <h4 className="text-xs font-bold text-gray-800">Trajectory Line Chart Waiting For Data</h4>
+                    <p className="text-[11px] text-gray-400 max-w-sm mt-1">
+                      Your score progress and ranking trends will be automatically graphed here chronologically once you take and submit quizzes in this project.
+                    </p>
+                  </div>
+                )}
+              </div>
 
               {/* History Table */}
               <div className="border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
@@ -220,44 +284,60 @@ export function StudentPerformanceModal({ projectId, userId, studentName, onClos
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 bg-white">
-                    {quizzes.map((q) => (
-                      <tr key={q.quizId} className="hover:bg-indigo-50/30 transition-colors">
-                        <td className="py-2.5 px-3 font-semibold text-gray-900 truncate max-w-xs">
-                          {q.quizTitle}
-                        </td>
-                        <td className="py-2.5 px-3 text-center font-bold text-gray-800">
-                          {q.score}{" "}
-                          <span className="text-[10px] text-gray-400 font-normal">
-                            / {q.totalMarks}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          <span
-                            className={`font-bold px-2 py-0.5 rounded-full text-[11px] ${
-                              q.percentage >= 80
-                                ? "bg-emerald-100 text-emerald-800"
-                                : q.percentage >= 50
-                                ? "bg-amber-100 text-amber-800"
-                                : "bg-rose-100 text-rose-800"
-                            }`}
-                          >
-                            {q.percentage}%
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          <span className="font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded text-[11px]">
-                            #{q.rank} / {q.totalParticipants}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-right text-[11px] text-gray-500">
-                          {new Date(q.submittedAt).toLocaleDateString(undefined, {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })}
+                    {quizzes.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-10 text-center bg-gray-50/40">
+                          <div className="flex flex-col items-center justify-center gap-1.5 text-gray-500">
+                            <BookOpen size={20} className="text-gray-300" />
+                            <span className="font-semibold text-gray-700 text-xs">
+                              No quiz attempts recorded yet
+                            </span>
+                            <span className="text-[11px] text-gray-400 max-w-sm">
+                              Take any published quiz in this project to track your score history and performance breakdown.
+                            </span>
+                          </div>
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      quizzes.map((q) => (
+                        <tr key={q.quizId} className="hover:bg-indigo-50/30 transition-colors">
+                          <td className="py-2.5 px-3 font-semibold text-gray-900 truncate max-w-xs">
+                            {q.quizTitle}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-bold text-gray-800">
+                            {q.score}{" "}
+                            <span className="text-[10px] text-gray-400 font-normal">
+                              / {q.totalMarks}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span
+                              className={`font-bold px-2 py-0.5 rounded-full text-[11px] ${
+                                q.percentage >= 80
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : q.percentage >= 50
+                                  ? "bg-amber-100 text-amber-800"
+                                  : "bg-rose-100 text-rose-800"
+                              }`}
+                            >
+                              {q.percentage}%
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span className="font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded text-[11px]">
+                              #{q.rank} / {q.totalParticipants}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-[11px] text-gray-500">
+                            {new Date(q.submittedAt).toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -278,4 +358,3 @@ export function StudentPerformanceModal({ projectId, userId, studentName, onClos
     </div>
   )
 }
-
