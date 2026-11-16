@@ -1,9 +1,25 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { getQuizAnalytics, downloadQuizAnswersExcel } from "@/lib/api/quizzes"
+import { useSocket } from "@/context/SocketContext"
 import type { QuizAnalytics, QuestionBreakdown, ResponseDistributionItem } from "@/types/quiz"
-import { X, PieChart, BarChart2, ListFilter, CheckCircle2, Users, HelpCircle, Award, Check, FileSpreadsheet } from "lucide-react"
+import { QuizLeaderboardModal } from "./QuizLeaderboardModal"
+import {
+  X,
+  PieChart,
+  BarChart2,
+  ListFilter,
+  CheckCircle2,
+  Users,
+  HelpCircle,
+  Award,
+  Check,
+  FileSpreadsheet,
+  Trophy,
+  MinusCircle,
+  Sparkles,
+} from "lucide-react"
 
 interface Props {
   projectId: string
@@ -165,6 +181,16 @@ function QuestionCard({ q, index }: { q: QuestionBreakdown; index: number }) {
             <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
               {q.type.replace("_", " ")}
             </span>
+            {q.type === "MULTIPLE_CORRECT" && (
+              <span className="text-[11px] font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded">
+                Multiple Correct ({q.partialMarkingRule ? q.partialMarkingRule.replace(/_/g, " ").toLowerCase() : "proportional"})
+              </span>
+            )}
+            {q.negativeMarks !== undefined && q.negativeMarks > 0 && (
+              <span className="text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded flex items-center gap-1">
+                <MinusCircle size={10} /> -{q.negativeMarks} penalty
+              </span>
+            )}
             <span className="text-xs font-medium text-gray-500">
               {q.marks} {q.marks === 1 ? "mark" : "marks"}
             </span>
@@ -174,6 +200,17 @@ function QuestionCard({ q, index }: { q: QuestionBreakdown; index: number }) {
             <div className="mt-2 text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/80 rounded-md px-2.5 py-1 inline-flex items-center gap-1.5">
               <CheckCircle2 size={14} className="text-emerald-600" />
               Correct Answer: <span className="font-bold">{q.correctAnswer}</span>
+            </div>
+          )}
+          {q.modelAnswer && (
+            <div className="mt-2 p-3 bg-blue-50/80 border border-blue-200 rounded-lg text-xs text-blue-950">
+              <div className="flex items-center gap-1 font-bold text-blue-900 mb-1">
+                <Sparkles size={13} className="text-blue-600" />
+                <span>Model Answer / Explanation:</span>
+              </div>
+              <p className="whitespace-pre-wrap leading-relaxed text-blue-900 font-normal">
+                {q.modelAnswer}
+              </p>
             </div>
           )}
         </div>
@@ -252,6 +289,8 @@ export function QuizAnalyticsModal({ projectId, quizId, quizTitle, onClose }: Pr
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false)
+  const { socket, joinProject } = useSocket()
 
   const handleDownloadExcel = async () => {
     try {
@@ -264,18 +303,58 @@ export function QuizAnalyticsModal({ projectId, quizId, quizTitle, onClose }: Pr
     }
   }
 
-  useEffect(() => {
-    getQuizAnalytics(projectId, quizId)
-      .then((data) => {
-        setAnalytics(data)
-        setLoading(false)
-      })
-      .catch((err) => {
-        console.error("Failed to load analytics", err)
-        setError(err.message || "Failed to load analytics")
-        setLoading(false)
-      })
+  const loadAnalytics = useCallback(async (silent = false) => {
+    try {
+      if (!silent) setLoading(true)
+      const data = await getQuizAnalytics(projectId, quizId)
+      setAnalytics(data)
+      setError(null)
+    } catch (err: any) {
+      console.error("Failed to load analytics", err)
+      if (!silent) setError(err.message || "Failed to load analytics")
+    } finally {
+      if (!silent) setLoading(false)
+    }
   }, [projectId, quizId])
+
+  useEffect(() => {
+    loadAnalytics(false)
+  }, [loadAnalytics])
+
+  useEffect(() => {
+    if (projectId) {
+      joinProject(projectId)
+    }
+  }, [projectId, joinProject])
+
+  // Real-time dynamic statistic updates
+  useEffect(() => {
+    if (!socket || !quizId) return
+
+    socket.emit("join_quiz", { quizId })
+
+    const handleSubmission = (data: { quizId: string }) => {
+      if (data.quizId === quizId) {
+        loadAnalytics(true)
+      }
+    }
+
+    const handleQuizUpdate = (data: any) => {
+      const qId = data?.quizId || data?.id
+      if (qId === quizId) {
+        loadAnalytics(true)
+      }
+    }
+
+    socket.on("submission_recorded", handleSubmission)
+    socket.on("quiz_updated", handleQuizUpdate)
+
+    return () => {
+      socket.emit("leave_quiz", { quizId })
+      socket.off("submission_recorded", handleSubmission)
+      socket.off("quiz_updated", handleQuizUpdate)
+    }
+  }, [socket, quizId, loadAnalytics])
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -306,7 +385,16 @@ export function QuizAnalyticsModal({ projectId, quizId, quizTitle, onClose }: Pr
               )}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => setLeaderboardOpen(true)}
+                className="text-xs font-semibold text-amber-900 bg-amber-100/90 hover:bg-amber-200 border border-amber-300 px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-xs transition-all"
+                title="View Quiz Leaderboard"
+              >
+                <Trophy size={14} className="text-amber-600" />
+                <span>Leaderboard</span>
+              </button>
+
               {analytics?.status === 'CLOSED' ? (
                 <button
                   onClick={handleDownloadExcel}
@@ -404,6 +492,15 @@ export function QuizAnalyticsModal({ projectId, quizId, quizTitle, onClose }: Pr
           </button>
         </div>
       </div>
+
+      {leaderboardOpen && (
+        <QuizLeaderboardModal
+          projectId={projectId}
+          quizId={quizId}
+          quizTitle={analytics?.title || quizTitle}
+          onClose={() => setLeaderboardOpen(false)}
+        />
+      )}
     </div>
   )
 }

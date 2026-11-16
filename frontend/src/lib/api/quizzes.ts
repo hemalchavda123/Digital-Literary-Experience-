@@ -37,7 +37,16 @@ export const getQuizById = async (projectId: string, quizId: string): Promise<Qu
 
 export const createQuiz = async (
   projectId: string,
-  payload: { title: string; description?: string; status?: string; questions: any[]; documentId?: string | null; annotationId?: string | null }
+  payload: {
+    title: string;
+    description?: string;
+    status?: string;
+    questions: any[];
+    answerRevealMode?: string;
+    showLeaderboard?: boolean;
+    documentId?: string | null;
+    annotationId?: string | null;
+  }
 ): Promise<Quiz> => {
   const res = await authFetch(`${API_BASE_URL}/projects/${projectId}/quizzes`, {
     method: 'POST',
@@ -51,7 +60,16 @@ export const createQuiz = async (
 export const updateQuiz = async (
   projectId: string,
   quizId: string,
-  payload: { title?: string; description?: string; status?: string; questions?: any[]; documentId?: string | null; annotationId?: string | null }
+  payload: {
+    title?: string;
+    description?: string;
+    status?: string;
+    questions?: any[];
+    answerRevealMode?: string;
+    showLeaderboard?: boolean;
+    documentId?: string | null;
+    annotationId?: string | null;
+  }
 ): Promise<Quiz> => {
   const res = await authFetch(`${API_BASE_URL}/projects/${projectId}/quizzes/${quizId}`, {
     method: 'PUT',
@@ -111,6 +129,9 @@ export const getMySubmission = async (
   isOwner?: boolean;
   totalMarks?: number;
   submission: QuizSubmission | null;
+  quiz?: Quiz | null;
+  shouldRevealAnswers?: boolean;
+  showLeaderboard?: boolean;
   questionStates?: Record<
     string,
     {
@@ -144,6 +165,61 @@ export const getQuizAnalytics = async (projectId: string, quizId: string): Promi
 export const getPdfQuizAnalytics = async (projectId: string, docId: string): Promise<PdfQuizAnalytics> => {
   const res = await authFetch(`${API_BASE_URL}/projects/${projectId}/quizzes/document/${docId}/analytics`);
   if (!res.ok) throw new Error(await extractError(res, "Failed to fetch document PDF quiz analytics"));
+  return res.json();
+};
+
+export const getQuizLeaderboard = async (
+  projectId: string,
+  quizId: string
+): Promise<{
+  quizId: string;
+  quizTitle: string;
+  maxPossibleScore: number;
+  showLeaderboard: boolean;
+  leaderboard: {
+    rank: number;
+    userId: string;
+    username: string;
+    email?: string;
+    totalScore: number;
+    maxPossibleScore: number;
+    percentage: number;
+    submittedAt: string;
+    answersCount: number;
+  }[];
+}> => {
+  const res = await authFetch(`${API_BASE_URL}/projects/${projectId}/quizzes/${quizId}/leaderboard?_t=${Date.now()}`, {
+    cache: 'no-store',
+    headers: { 'Cache-Control': 'no-cache' },
+  });
+  if (!res.ok) throw new Error(await extractError(res, "Failed to fetch leaderboard"));
+  return res.json();
+};
+
+export const getStudentPerformanceTracker = async (
+  projectId: string,
+  userId?: string
+): Promise<{
+  userId: string;
+  username: string;
+  email?: string;
+  totalQuizzesTaken: number;
+  averageScorePercentage: number;
+  highestScorePercentage: number;
+  quizzes: {
+    quizId: string;
+    quizTitle: string;
+    submittedAt: string;
+    score: number;
+    totalMarks: number;
+    percentage: number;
+    rank: number;
+    totalParticipants: number;
+  }[];
+}> => {
+  const qStr = userId ? `?userId=${encodeURIComponent(userId)}` : '';
+  const res = await authFetch(`${API_BASE_URL}/projects/${projectId}/quizzes/performance${qStr}`);
+  if (!res.ok) throw new Error(await extractError(res, "Failed to fetch performance tracker"));
   return res.json();
 };
 

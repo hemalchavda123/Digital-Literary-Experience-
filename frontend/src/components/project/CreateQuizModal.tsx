@@ -2,11 +2,11 @@
 
 import { useState } from "react"
 import { useProjects } from "@/context/ProjectContext"
-import { QuestionType } from "@/types/quiz"
+import { QuestionType, AnswerRevealMode, PartialMarkingRule } from "@/types/quiz"
 import { createQuiz as apiCreateQuiz } from "@/lib/api/quizzes"
 import { AddQuestionsFromTextModal } from "@/components/project/AddQuestionsFromTextModal"
 import { ParsedQuestion } from "@/lib/quizTextParser"
-import { FileText } from "lucide-react"
+import { FileText, Trophy, Eye, ShieldAlert } from "lucide-react"
 
 interface Props {
   projectId: string
@@ -21,7 +21,10 @@ interface TempQuestion {
   questionText: string
   options: string[]
   marks: number
+  negativeMarks: number
+  partialMarkingRule: PartialMarkingRule
   correctAnswer: string
+  modelAnswer: string
   isPublished: boolean
 }
 
@@ -34,6 +37,8 @@ export function CreateQuizModal({ projectId, documentId, annotationId, onClose }
   const { fetchQuizzes } = useProjects()
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
+  const [answerRevealMode, setAnswerRevealMode] = useState<AnswerRevealMode>("IMMEDIATE")
+  const [showLeaderboard, setShowLeaderboard] = useState<boolean>(true)
   const [questions, setQuestions] = useState<TempQuestion[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isTextImportOpen, setIsTextImportOpen] = useState(false)
@@ -47,7 +52,10 @@ export function CreateQuizModal({ projectId, documentId, annotationId, onClose }
         questionText: "",
         options: ["Option 1", "Option 2"],
         marks: 1,
+        negativeMarks: 0,
+        partialMarkingRule: "PROPORTIONAL_WITH_PENALTY",
         correctAnswer: "",
+        modelAnswer: "",
         isPublished: true,
       },
     ])
@@ -59,13 +67,16 @@ export function CreateQuizModal({ projectId, documentId, annotationId, onClose }
       type: q.type,
       questionText: q.questionText,
       options:
-        q.type === "MULTIPLE_CHOICE"
+        q.type === "MULTIPLE_CHOICE" || q.type === "MULTIPLE_CORRECT"
           ? q.options.length >= 2
             ? q.options
             : ["Option 1", "Option 2"]
           : ["Option 1", "Option 2"],
       marks: q.marks,
+      negativeMarks: 0,
+      partialMarkingRule: "PROPORTIONAL_WITH_PENALTY",
       correctAnswer: q.correctAnswer,
+      modelAnswer: "",
       isPublished: q.isPublished,
     }))
     setQuestions((prev) => [...prev, ...newQuestions])
@@ -131,12 +142,17 @@ export function CreateQuizModal({ projectId, documentId, annotationId, onClose }
         status,
         documentId: documentId || null,
         annotationId: annotationId || null,
+        answerRevealMode,
+        showLeaderboard,
         questions: questions.map((q) => ({
           type: q.type,
           questionText: q.questionText,
-          options: q.type === "MULTIPLE_CHOICE" ? q.options : null,
+          options: q.type === "MULTIPLE_CHOICE" || q.type === "MULTIPLE_CORRECT" ? q.options : null,
           marks: q.marks,
+          negativeMarks: q.negativeMarks,
+          partialMarkingRule: q.partialMarkingRule,
           correctAnswer: q.correctAnswer.trim() || null,
+          modelAnswer: q.modelAnswer.trim() || null,
           isPublished: q.isPublished,
         })),
       })
@@ -183,6 +199,37 @@ export function CreateQuizModal({ projectId, documentId, annotationId, onClose }
               placeholder="Quiz Description (optional)"
               className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-black min-h-[100px] resize-none text-gray-900 placeholder-gray-500"
             />
+
+            {/* Quiz Settings: Answer Reveal & Leaderboard */}
+            <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <Eye size={15} className="text-[#a17038]" />
+                <span className="font-semibold text-gray-700">Answer Reveal Policy:</span>
+                <select
+                  value={answerRevealMode}
+                  onChange={(e) => setAnswerRevealMode(e.target.value as AnswerRevealMode)}
+                  className="p-1.5 border border-gray-300 rounded bg-white text-gray-900 focus:outline-none"
+                >
+                  <option value="IMMEDIATE">Immediate (Upon Submission)</option>
+                  <option value="AFTER_QUIZ_CLOSED">After Quiz is Closed</option>
+                  <option value="MARKS_ONLY">Show Marks Only</option>
+                  <option value="NEVER">Never Reveal</option>
+                </select>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer font-semibold text-gray-700 select-none">
+                <input
+                  type="checkbox"
+                  checked={showLeaderboard}
+                  onChange={(e) => setShowLeaderboard(e.target.checked)}
+                  className="w-4 h-4 rounded text-[#a17038] focus:ring-[#a17038]"
+                />
+                <span className="flex items-center gap-1">
+                  <Trophy size={14} className="text-amber-600" />
+                  Allow Students to View Leaderboard
+                </span>
+              </label>
+            </div>
           </div>
 
           {/* Questions */}
@@ -253,7 +300,7 @@ export function CreateQuizModal({ projectId, documentId, annotationId, onClose }
                   </button>
 
                   <div className="flex flex-col gap-3 pr-8">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <span className="font-semibold text-gray-700 w-6">{index + 1}.</span>
                       <select
                         value={q.type}
@@ -261,18 +308,49 @@ export function CreateQuizModal({ projectId, documentId, annotationId, onClose }
                         className="p-2 border border-gray-300 rounded focus:outline-none bg-white text-sm text-black"
                       >
                         <option value="MULTIPLE_CHOICE">Multiple Choice</option>
+                        <option value="MULTIPLE_CORRECT">Multiple Correct</option>
                         <option value="ONE_WORD">One Word</option>
                         <option value="SHORT_ANSWER">Short Answer</option>
                       </select>
-                      <input
-                        type="number"
-                        value={q.marks}
-                        onChange={(e) => updateQuestion(q.id, "marks", parseInt(e.target.value) || 1)}
-                        className="w-20 p-2 border border-gray-300 rounded focus:outline-none text-sm text-gray-900"
-                        placeholder="Marks"
-                        min="1"
-                      />
-                      <span className="text-xs font-medium text-gray-500">Marks</span>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="0.5"
+                          value={q.marks}
+                          onChange={(e) => updateQuestion(q.id, "marks", parseFloat(e.target.value) || 1)}
+                          className="w-16 p-2 border border-gray-300 rounded focus:outline-none text-sm text-gray-900 bg-white"
+                          placeholder="Marks"
+                        />
+                        <span className="text-xs font-medium text-gray-500">Marks</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 bg-rose-50/60 border border-rose-200 px-2 py-1 rounded">
+                        <ShieldAlert size={13} className="text-rose-500" />
+                        <span className="text-xs font-medium text-rose-700">Penalty:</span>
+                        <input
+                          type="number"
+                          step="0.25"
+                          min="0"
+                          value={q.negativeMarks || 0}
+                          onChange={(e) => updateQuestion(q.id, "negativeMarks", parseFloat(e.target.value) || 0)}
+                          className="w-14 p-1 border border-rose-200 rounded text-xs text-rose-900 bg-white"
+                          placeholder="0"
+                        />
+                      </div>
+                      {q.type === "MULTIPLE_CORRECT" && (
+                        <div className="flex items-center gap-1.5 bg-emerald-50/60 border border-emerald-200 px-2 py-1 rounded">
+                          <span className="text-xs font-medium text-emerald-800">Rule:</span>
+                          <select
+                            value={q.partialMarkingRule || "PROPORTIONAL_WITH_PENALTY"}
+                            onChange={(e) => updateQuestion(q.id, "partialMarkingRule", e.target.value as PartialMarkingRule)}
+                            className="p-1 border border-emerald-200 rounded text-xs bg-white text-emerald-900"
+                          >
+                            <option value="PROPORTIONAL_WITH_PENALTY">Proportional with Penalty</option>
+                            <option value="POSITIVE_ONLY">Positive Partial Only</option>
+                            <option value="NONE">All or Nothing</option>
+                          </select>
+                        </div>
+                      )}
                     </div>
 
                     <input
@@ -283,7 +361,7 @@ export function CreateQuizModal({ projectId, documentId, annotationId, onClose }
                       className="w-full p-2 border border-gray-300 rounded focus:outline-none ml-9 text-gray-900 placeholder-gray-500"
                     />
 
-                    {q.type === "MULTIPLE_CHOICE" && (
+                    {(q.type === "MULTIPLE_CHOICE" || q.type === "MULTIPLE_CORRECT") && (
                       <div className="ml-9 mt-2 flex flex-col gap-2">
                         {q.options.map((opt, optIndex) => (
                           <div key={optIndex} className="flex items-center gap-2">
@@ -328,6 +406,36 @@ export function CreateQuizModal({ projectId, documentId, annotationId, onClose }
                             ))}
                           </select>
                         </div>
+                      ) : q.type === "MULTIPLE_CORRECT" ? (
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-medium text-gray-600">Correct Answers (select all that apply):</label>
+                          <div className="flex flex-wrap gap-2">
+                            {q.options.map((_, optIndex) => {
+                              const letter = getAlphabetLabel(optIndex)
+                              const selected = q.correctAnswer.split(",").map(s => s.trim()).includes(letter)
+                              return (
+                                <button
+                                  key={optIndex}
+                                  type="button"
+                                  onClick={() => {
+                                    const current = q.correctAnswer ? q.correctAnswer.split(",").map(s => s.trim()).filter(Boolean) : []
+                                    const updated = selected
+                                      ? current.filter(l => l !== letter)
+                                      : [...current, letter].sort()
+                                    updateQuestion(q.id, "correctAnswer", updated.join(","))
+                                  }}
+                                  className={`w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold transition-colors border ${
+                                    selected
+                                      ? "bg-emerald-600 text-white border-emerald-700"
+                                      : "bg-white text-gray-700 border-gray-300 hover:border-gray-400"
+                                  }`}
+                                >
+                                  {letter}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
                       ) : (
                         <input
                           type="text"
@@ -337,6 +445,19 @@ export function CreateQuizModal({ projectId, documentId, annotationId, onClose }
                           className="w-full p-2 border border-gray-200 rounded focus:outline-none text-sm bg-white text-gray-900 placeholder-gray-500"
                         />
                       )}
+
+                      {/* Model Answer / Explanation */}
+                      <div className="mt-2.5">
+                        <label className="text-xs font-semibold text-gray-700 block mb-1">
+                          Model Answer / Explanation (revealed according to Answer Reveal Policy):
+                        </label>
+                        <textarea
+                          value={q.modelAnswer || ""}
+                          onChange={(e) => updateQuestion(q.id, "modelAnswer", e.target.value)}
+                          placeholder="Ideal explanation, rubric, or sample model response for students to review..."
+                          className="w-full p-2 border border-gray-200 rounded text-xs bg-white text-gray-900 placeholder-gray-400 min-h-[60px] resize-none focus:outline-none focus:ring-1 focus:ring-black"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>

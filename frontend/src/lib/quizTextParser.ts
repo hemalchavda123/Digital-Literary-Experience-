@@ -15,6 +15,7 @@ export interface ParseQuizResult {
   summary: {
     total: number
     multipleChoice: number
+    multipleCorrect: number
     oneWord: number
     shortAnswer: number
   }
@@ -105,7 +106,8 @@ function createDraft(): DraftQuestion {
 /**
  * Parses raw text containing multiple questions into structured quiz questions.
  * Supports:
- * - MULTIPLE_CHOICE (with A/B/C/D options, marked answers or Answer: lines)
+ * - MULTIPLE_CHOICE (with A/B/C/D options, single marked answer or Answer: line)
+ * - MULTIPLE_CORRECT (with A/B/C/D options, multiple marked correct answers)
  * - ONE_WORD (single word or fill in the blank questions)
  * - SHORT_ANSWER (open-ended or descriptive questions)
  */
@@ -113,7 +115,7 @@ export function parseQuizQuestionsFromText(inputText: string): ParseQuizResult {
   if (!inputText || !inputText.trim()) {
     return {
       questions: [],
-      summary: { total: 0, multipleChoice: 0, oneWord: 0, shortAnswer: 0 },
+      summary: { total: 0, multipleChoice: 0, multipleCorrect: 0, oneWord: 0, shortAnswer: 0 },
       warnings: [],
     }
   }
@@ -160,7 +162,7 @@ export function parseQuizQuestionsFromText(inputText: string): ParseQuizResult {
     )
     // Check bracketed type prefix at start: e.g. "[MCQ] ...", "[One Word] ...", "[Short Answer] ..."
     const bracketTypeMatch = line.match(
-      /^\[(mcq|multiple\s*choice|one\s*word|single\s*word|fill\s*in\s*the\s*blank|short\s*answer|descriptive|essay)\]\s*(.*)$/i
+      /^\[(mcq|multiple\s*choice|multiple\s*correct|multi\s*select|checkbox|one\s*word|single\s*word|fill\s*in\s*the\s*blank|short\s*answer|descriptive|essay)\]\s*(.*)$/i
     )
 
     if (qHeaderMatch || bracketTypeMatch) {
@@ -169,11 +171,15 @@ export function parseQuizQuestionsFromText(inputText: string): ParseQuizResult {
 
       // Extract bracket type if present
       const bMatch = text.match(
-        /^\[(mcq|multiple\s*choice|one\s*word|single\s*word|fill\s*in\s*the\s*blank|short\s*answer|descriptive|essay)\]\s*(.*)$/i
+        /^\[(mcq|multiple\s*choice|multiple\s*correct|multi\s*select|checkbox|one\s*word|single\s*word|fill\s*in\s*the\s*blank|short\s*answer|descriptive|essay)\]\s*(.*)$/i
       )
       if (bMatch && currentDraft) {
         const typeStr = bMatch[1].toLowerCase()
-        if (typeStr.includes("choice") || typeStr.includes("mcq")) {
+        if (typeStr.includes("multi") && (typeStr.includes("correct") || typeStr.includes("select"))) {
+          currentDraft.explicitType = "MULTIPLE_CORRECT"
+        } else if (typeStr.includes("checkbox")) {
+          currentDraft.explicitType = "MULTIPLE_CORRECT"
+        } else if (typeStr.includes("choice") || typeStr.includes("mcq")) {
           currentDraft.explicitType = "MULTIPLE_CHOICE"
         } else if (
           typeStr.includes("one") ||
@@ -224,7 +230,11 @@ export function parseQuizQuestionsFromText(inputText: string): ParseQuizResult {
     const typeMetaMatch = line.match(/^(?:type|question\s*type)\s*[:=\-]\s*(.+)$/i)
     if (typeMetaMatch) {
       const typeStr = typeMetaMatch[1].toLowerCase()
-      if (typeStr.includes("choice") || typeStr.includes("mcq")) {
+      if (typeStr.includes("multi") && (typeStr.includes("correct") || typeStr.includes("select"))) {
+        currentDraft.explicitType = "MULTIPLE_CORRECT"
+      } else if (typeStr.includes("checkbox")) {
+        currentDraft.explicitType = "MULTIPLE_CORRECT"
+      } else if (typeStr.includes("choice") || typeStr.includes("mcq")) {
         currentDraft.explicitType = "MULTIPLE_CHOICE"
       } else if (
         typeStr.includes("one") ||
@@ -331,6 +341,7 @@ export function parseQuizQuestionsFromText(inputText: string): ParseQuizResult {
   const questions: ParsedQuestion[] = []
   const warnings: string[] = []
   let mcqCount = 0
+  let multipleCorrectCount = 0
   let oneWordCount = 0
   let shortAnswerCount = 0
 
@@ -348,7 +359,12 @@ export function parseQuizQuestionsFromText(inputText: string): ParseQuizResult {
     // Type Inference if not explicitly defined
     if (!draft.explicitType) {
       if (options.length >= 1) {
-        type = "MULTIPLE_CHOICE"
+        const markedCorrectCount = draft.options.filter((o) => o.isCorrect).length
+        if (markedCorrectCount > 1) {
+          type = "MULTIPLE_CORRECT"
+        } else {
+          type = "MULTIPLE_CHOICE"
+        }
       } else if (
         /fill\s*in\s*the\s*blank/i.test(questionText) ||
         /_{3,}/.test(questionText) ||
@@ -378,6 +394,26 @@ export function parseQuizQuestionsFromText(inputText: string): ParseQuizResult {
 
       if (options.length < 2) {
         warning = `Question ${questions.length + 1}: Multiple choice questions should have at least 2 options.`
+        warnings.push(warning)
+      }
+    } else if (type === "MULTIPLE_CORRECT") {
+      multipleCorrectCount++
+      // Collect all marked correct options
+      const markedOpts = draft.options.filter((o) => o.isCorrect)
+      if (markedOpts.length > 0) {
+        correctAnswer = markedOpts.map((o) => o.label).sort().join(",")
+      } else if (rawAns) {
+        // Parse comma-separated answer like "A,C" or "A, C"
+        correctAnswer = rawAns.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean).sort().join(",")
+      }
+
+      if (!correctAnswer && options.length > 0) {
+        warning = `Question ${questions.length + 1}: No correct answers specified for multi-select question.`
+        warnings.push(warning)
+      }
+
+      if (options.length < 2) {
+        warning = `Question ${questions.length + 1}: Multi-select questions should have at least 2 options.`
         warnings.push(warning)
       }
     } else if (type === "ONE_WORD") {
@@ -411,6 +447,7 @@ export function parseQuizQuestionsFromText(inputText: string): ParseQuizResult {
     summary: {
       total: questions.length,
       multipleChoice: mcqCount,
+      multipleCorrect: multipleCorrectCount,
       oneWord: oneWordCount,
       shortAnswer: shortAnswerCount,
     },

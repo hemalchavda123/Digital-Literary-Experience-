@@ -46,6 +46,8 @@ export const initSocket = (server: HttpServer) => {
   io.on('connection', (socket: Socket) => {
     console.log(`Socket connected: ${socket.id}`);
 
+    const activeQuizzes = new Set<string>();
+
     socket.on('join_project', (projectId: string) => {
       console.log(`Socket ${socket.id} joined project: ${projectId}`);
       socket.join(`project:${projectId}`);
@@ -54,6 +56,35 @@ export const initSocket = (server: HttpServer) => {
     socket.on('leave_project', (projectId: string) => {
       console.log(`Socket ${socket.id} left project: ${projectId}`);
       socket.leave(`project:${projectId}`);
+    });
+
+    // Quiz Presence (Live student count)
+    socket.on('join_quiz', ({ quizId, projectId }: { quizId: string; projectId?: string }) => {
+      socket.join(`quiz:${quizId}`);
+      activeQuizzes.add(quizId);
+      const activeCount = io.sockets.adapter.rooms.get(`quiz:${quizId}`)?.size || 0;
+      io.to(`quiz:${quizId}`).emit('quiz_presence_update', { quizId, activeCount });
+      if (projectId) {
+        io.to(`project:${projectId}`).emit('quiz_presence_update', { quizId, activeCount });
+      }
+    });
+
+    socket.on('leave_quiz', ({ quizId, projectId }: { quizId: string; projectId?: string }) => {
+      socket.leave(`quiz:${quizId}`);
+      activeQuizzes.delete(quizId);
+      const activeCount = io.sockets.adapter.rooms.get(`quiz:${quizId}`)?.size || 0;
+      io.to(`quiz:${quizId}`).emit('quiz_presence_update', { quizId, activeCount });
+      if (projectId) {
+        io.to(`project:${projectId}`).emit('quiz_presence_update', { quizId, activeCount });
+      }
+    });
+
+    socket.on('disconnecting', () => {
+      for (const quizId of activeQuizzes) {
+        const room = io.sockets.adapter.rooms.get(`quiz:${quizId}`);
+        const activeCount = room ? Math.max(0, room.size - 1) : 0;
+        io.to(`quiz:${quizId}`).emit('quiz_presence_update', { quizId, activeCount });
+      }
     });
 
     socket.on('disconnect', () => {

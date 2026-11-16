@@ -1,11 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { getQuizAnalytics, downloadQuizAnswersExcel } from "@/lib/api/quizzes"
 import { getProjectById } from "@/lib/api/projects"
+import { useSocket } from "@/context/SocketContext"
 import type { QuizAnalytics, QuestionBreakdown, ResponseDistributionItem } from "@/types/quiz"
 import Navbar from "@/components/Navbar"
+import { QuizLeaderboardModal } from "@/components/project/QuizLeaderboardModal"
 import {
   ArrowLeft,
   PieChart,
@@ -17,6 +19,10 @@ import {
   Award,
   Check,
   FileSpreadsheet,
+  Trophy,
+  MinusCircle,
+  Sparkles,
+  RefreshCw,
 } from "lucide-react"
 
 // Classic Google Forms response chart color palette
@@ -174,6 +180,16 @@ function QuestionCard({ q, index, totalQuestions }: { q: QuestionBreakdown; inde
             <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
               {q.type.replace("_", " ").toLowerCase()}
             </span>
+            {q.type === "MULTIPLE_CORRECT" && (
+              <span className="text-[11px] font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded">
+                Multiple Correct ({q.partialMarkingRule ? q.partialMarkingRule.replace(/_/g, " ").toLowerCase() : "proportional"})
+              </span>
+            )}
+            {q.negativeMarks !== undefined && q.negativeMarks > 0 && (
+              <span className="text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded flex items-center gap-1">
+                <MinusCircle size={10} /> -{q.negativeMarks} penalty
+              </span>
+            )}
             <span className="text-gray-300">•</span>
             <span className="text-xs text-gray-500">
               {q.marks} {q.marks === 1 ? "mark" : "marks"}
@@ -186,6 +202,18 @@ function QuestionCard({ q, index, totalQuestions }: { q: QuestionBreakdown; inde
             <div className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200/60 rounded-md px-2.5 py-1 inline-flex items-center gap-1.5 mt-1">
               <CheckCircle2 size={14} className="text-emerald-600" />
               Correct answer: <span className="font-semibold">{q.correctAnswer}</span>
+            </div>
+          )}
+
+          {q.modelAnswer && (
+            <div className="mt-2 p-3 bg-blue-50/80 border border-blue-200 rounded-lg text-xs text-blue-950">
+              <div className="flex items-center gap-1 font-bold text-blue-900 mb-1">
+                <Sparkles size={13} className="text-blue-600" />
+                <span>Model Answer / Explanation:</span>
+              </div>
+              <p className="whitespace-pre-wrap leading-relaxed text-blue-900 font-normal">
+                {q.modelAnswer}
+              </p>
             </div>
           )}
         </div>
@@ -267,11 +295,13 @@ function QuestionCard({ q, index, totalQuestions }: { q: QuestionBreakdown; inde
 export default function QuizAnalyticsPage() {
   const params = useParams<{ projectId: string; quizId: string }>()
   const router = useRouter()
+  const { socket, joinProject } = useSocket()
   const [analytics, setAnalytics] = useState<QuizAnalytics | null>(null)
   const [projectName, setProjectName] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false)
 
   const handleDownloadExcel = async () => {
     if (!analytics) return
@@ -285,25 +315,62 @@ export default function QuizAnalyticsPage() {
     }
   }
 
+  const load = useCallback(async (silent = false) => {
+    try {
+      if (!silent) setLoading(true)
+      const [data, proj] = await Promise.all([
+        getQuizAnalytics(params.projectId, params.quizId),
+        getProjectById(params.projectId).catch(() => null),
+      ])
+      setAnalytics(data)
+      if (proj) setProjectName((proj as any).name || "")
+      setError(null)
+    } catch (err: any) {
+      console.error("Failed to load quiz analytics", err)
+      if (!silent) setError(err.message || "Failed to load quiz analytics")
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }, [params.projectId, params.quizId])
+
   useEffect(() => {
-    async function load() {
-      try {
-        setLoading(true)
-        const [data, proj] = await Promise.all([
-          getQuizAnalytics(params.projectId, params.quizId),
-          getProjectById(params.projectId).catch(() => null),
-        ])
-        setAnalytics(data)
-        if (proj) setProjectName((proj as any).name || "")
-      } catch (err: any) {
-        console.error("Failed to load quiz analytics", err)
-        setError(err.message || "Failed to load quiz analytics")
-      } finally {
-        setLoading(false)
+    load(false)
+  }, [load])
+
+  useEffect(() => {
+    if (params.projectId) {
+      joinProject(params.projectId)
+    }
+  }, [params.projectId, joinProject])
+
+  // Real-time dynamic statistic updates when submissions arrive
+  useEffect(() => {
+    if (!socket || !params.quizId) return
+
+    socket.emit("join_quiz", { quizId: params.quizId })
+
+    const handleSubmission = (data: { quizId: string }) => {
+      if (data.quizId === params.quizId) {
+        load(true)
       }
     }
-    load()
-  }, [params.projectId, params.quizId])
+
+    const handleQuizUpdate = (data: any) => {
+      const qId = data?.quizId || data?.id
+      if (qId === params.quizId) {
+        load(true)
+      }
+    }
+
+    socket.on("submission_recorded", handleSubmission)
+    socket.on("quiz_updated", handleQuizUpdate)
+
+    return () => {
+      socket.emit("leave_quiz", { quizId: params.quizId })
+      socket.off("submission_recorded", handleSubmission)
+      socket.off("quiz_updated", handleQuizUpdate)
+    }
+  }, [socket, params.quizId, load])
 
   return (
     <div className="min-h-screen bg-white flex flex-col font-sans">
@@ -359,7 +426,16 @@ export default function QuizAnalyticsPage() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 self-start sm:self-auto flex-shrink-0">
+                <div className="flex items-center gap-2 self-start sm:self-auto flex-shrink-0 flex-wrap">
+                  <button
+                    onClick={() => setLeaderboardOpen(true)}
+                    className="text-xs font-semibold text-amber-900 bg-amber-100/90 hover:bg-amber-200 border border-amber-300 px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-xs transition-all"
+                    title="View Quiz Leaderboard"
+                  >
+                    <Trophy size={14} className="text-amber-600" />
+                    <span>Leaderboard</span>
+                  </button>
+
                   {analytics.status === 'CLOSED' ? (
                     <button
                       onClick={handleDownloadExcel}
@@ -420,6 +496,14 @@ export default function QuizAnalyticsPage() {
         ) : null}
       </main>
 
+      {leaderboardOpen && analytics && (
+        <QuizLeaderboardModal
+          projectId={params.projectId}
+          quizId={params.quizId}
+          quizTitle={analytics.title}
+          onClose={() => setLeaderboardOpen(false)}
+        />
+      )}
     </div>
   )
 }

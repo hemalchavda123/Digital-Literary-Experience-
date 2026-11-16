@@ -234,22 +234,38 @@ enum QuizStatus {
   CLOSED
 }
 
+enum AnswerRevealMode {
+  IMMEDIATE
+  AFTER_QUIZ_CLOSED
+  MARKS_ONLY
+  NEVER
+}
+
+enum PartialMarkingRule {
+  NONE
+  PROPORTIONAL_WITH_PENALTY
+  POSITIVE_ONLY
+}
+
 enum QuestionType {
   MULTIPLE_CHOICE
+  MULTIPLE_CORRECT
   ONE_WORD
   SHORT_ANSWER
 }
 
 model Quiz {
-  id           String    @id @default(uuid())
-  projectId    String
-  documentId   String?
-  annotationId String?
-  title        String
-  description  String    @default("")
-  status       QuizStatus @default(DRAFT)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id               String           @id @default(uuid())
+  projectId        String
+  documentId       String?
+  annotationId     String?
+  title            String
+  description      String           @default("")
+  status           QuizStatus       @default(DRAFT)
+  answerRevealMode AnswerRevealMode @default(IMMEDIATE)
+  showLeaderboard  Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   document    Document?    @relation(fields: [documentId], references: [id], onDelete: Cascade)
@@ -263,17 +279,20 @@ model Quiz {
 }
 
 model QuizQuestion {
-  id          String    @id @default(uuid())
-  quizId      String
-  type        QuestionType
-  questionText String
-  options     String?
-  order       Int       @default(0)
-  marks       Int       @default(1)
-  correctAnswer String? 
-  isPublished Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @default(now())
+  id                 String             @id @default(uuid())
+  quizId             String
+  type               QuestionType
+  questionText       String
+  options            String?
+  order              Int                @default(0)
+  marks              Float              @default(1)
+  negativeMarks      Float              @default(0)
+  partialMarkingRule PartialMarkingRule @default(PROPORTIONAL_WITH_PENALTY)
+  correctAnswer      String? 
+  modelAnswer        String?
+  isPublished        Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @default(now())
 
   quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
   answers     QuizAnswer[]
@@ -286,7 +305,7 @@ model QuizSubmission {
   quizId      String
   userId      String
   submittedAt DateTime  @default(now())
-  totalScore  Int?
+  totalScore  Float?
   history     Json?
 
   quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
@@ -304,7 +323,7 @@ model QuizAnswer {
   questionId     String
   answerText     String    @default("")
   isCorrect      Boolean?
-  score          Int?
+  score          Float?
 
   submission     QuizSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   question       QuizQuestion   @relation(fields: [questionId], references: [id], onDelete: Cascade)

@@ -12,6 +12,8 @@ import {
   getQuizAnalytics,
   getPdfQuizAnalytics,
   exportQuizAnswersExcel,
+  getQuizLeaderboard,
+  getStudentPerformanceTracker,
 } from '../controllers/quizController';
 import { authMiddleware } from '../middleware/authMiddleware';
 
@@ -23,6 +25,7 @@ router.use(authMiddleware);
 // Routes
 router.get('/', getQuizzes);
 router.post('/', createQuiz);
+router.get('/performance', getStudentPerformanceTracker);
 router.get('/document/:docId/analytics', getPdfQuizAnalytics);
 router.get('/:quizId', getQuizById);
 router.put('/:quizId', updateQuiz);
@@ -33,6 +36,7 @@ router.delete('/:quizId', deleteQuiz);
 router.get('/:quizId/my-submission', getMySubmission);
 router.post('/:quizId/submit', submitQuiz);
 router.get('/:quizId/submissions', getSubmissions);
+router.get('/:quizId/leaderboard', getQuizLeaderboard);
 
 // Analytics (Owner only)
 router.get('/:quizId/analytics', getQuizAnalytics);

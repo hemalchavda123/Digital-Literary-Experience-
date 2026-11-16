@@ -95,16 +95,29 @@ export const getQuizById = async (req: Request, res: Response, next: NextFunctio
     const totalMarks = quiz.questions.reduce((sum, q) => sum + (q.marks || 0), 0);
     (quiz as any).totalMarks = totalMarks;
 
-    // If quiz is closed and user is not owner: hide all questions
-    // "other users can't access the question, make it so that it'll show total marks only"
-    if (!isOwner && quiz.status === 'CLOSED') {
-      quiz.questions = [];
-    } else if (!isOwner) {
-      // SECURITY FIX: Hide correctAnswer from non-owners to prevent data leakage
-      quiz.questions = quiz.questions.map((q) => ({
-        ...q,
-        correctAnswer: null,
-      }));
+    // Check if answers should be revealed to this student
+    if (!isOwner) {
+      const studentSub = await prisma.quizSubmission.findUnique({
+        where: { quizId_userId: { quizId, userId } },
+      });
+
+      const shouldRevealAnswers =
+        (quiz.answerRevealMode === 'IMMEDIATE' && !!studentSub) ||
+        (quiz.answerRevealMode === 'AFTER_QUIZ_CLOSED' && quiz.status === 'CLOSED');
+
+      if (!shouldRevealAnswers) {
+        if (quiz.status === 'CLOSED' && quiz.answerRevealMode !== 'AFTER_QUIZ_CLOSED') {
+          // Hide questions completely when closed if answers should not be revealed
+          quiz.questions = [];
+        } else {
+          // Hide sensitive answers and model answers
+          quiz.questions = quiz.questions.map((q) => ({
+            ...q,
+            correctAnswer: null,
+            modelAnswer: null,
+          }));
+        }
+      }
     }
 
     res.json(quiz);
@@ -117,7 +130,7 @@ export const createQuiz = async (req: Request, res: Response, next: NextFunction
   try {
     const projectId = req.params.projectId as string;
     const userId = (req as any).user?.userId;
-    const { title, description, status, questions, documentId, annotationId } = req.body;
+    const { title, description, status, questions, documentId, annotationId, answerRevealMode, showLeaderboard } = req.body;
 
     const { isOwner } = await checkProjectAccess(projectId, userId);
     if (!isOwner) {
@@ -132,14 +145,19 @@ export const createQuiz = async (req: Request, res: Response, next: NextFunction
         title,
         description: description || '',
         status: status || 'DRAFT',
+        answerRevealMode: answerRevealMode || 'IMMEDIATE',
+        showLeaderboard: showLeaderboard !== undefined ? Boolean(showLeaderboard) : true,
         questions: {
           create: (questions || []).map((q: any, i: number) => ({
             type: q.type,
             questionText: q.questionText,
             options: q.options ? (typeof q.options === 'string' ? q.options : JSON.stringify(q.options)) : null,
             order: i,
-            marks: q.marks || 1,
+            marks: q.marks !== undefined ? Number(q.marks) : 1,
+            negativeMarks: q.negativeMarks !== undefined ? Number(q.negativeMarks) : 0,
+            partialMarkingRule: q.partialMarkingRule || 'PROPORTIONAL_WITH_PENALTY',
             correctAnswer: q.correctAnswer || null,
+            modelAnswer: q.modelAnswer || null,
             isPublished: q.isPublished !== undefined ? q.isPublished : true,
           })),
         },
@@ -169,7 +187,7 @@ export const updateQuiz = async (req: Request, res: Response, next: NextFunction
     const projectId = req.params.projectId as string;
     const quizId = req.params.quizId as string;
     const userId = (req as any).user?.userId;
-    const { title, description, status, questions, documentId, annotationId } = req.body;
+    const { title, description, status, questions, documentId, annotationId, answerRevealMode, showLeaderboard } = req.body;
 
     const { isOwner } = await checkProjectAccess(projectId, userId);
     if (!isOwner) {
@@ -194,6 +212,10 @@ export const updateQuiz = async (req: Request, res: Response, next: NextFunction
       for (let i = 0; i < questions.length; i++) {
         const q = questions[i];
         const formattedOptions = q.options ? (typeof q.options === 'string' ? q.options : JSON.stringify(q.options)) : null;
+        const qMarks = q.marks !== undefined ? Number(q.marks) : 1;
+        const qNegativeMarks = q.negativeMarks !== undefined ? Number(q.negativeMarks) : 0;
+        const qPartialRule = q.partialMarkingRule || 'PROPORTIONAL_WITH_PENALTY';
+        const qModelAnswer = q.modelAnswer !== undefined ? (q.modelAnswer ? String(q.modelAnswer).trim() : null) : null;
 
         if (q.id && existingMap.has(q.id)) {
           const existing = existingMap.get(q.id)!;
@@ -202,8 +224,11 @@ export const updateQuiz = async (req: Request, res: Response, next: NextFunction
           const typeChanged = existing.type !== q.type;
           const optionsChanged = existing.options !== formattedOptions;
           const answerChanged = (existing.correctAnswer || '') !== (q.correctAnswer || '');
-          const marksChanged = existing.marks !== (q.marks || 1);
-          const isModified = textChanged || typeChanged || optionsChanged || answerChanged || marksChanged;
+          const marksChanged = existing.marks !== qMarks;
+          const negativeMarksChanged = existing.negativeMarks !== qNegativeMarks;
+          const partialRuleChanged = existing.partialMarkingRule !== qPartialRule;
+          const modelAnswerChanged = (existing.modelAnswer || '') !== (qModelAnswer || '');
+          const isModified = textChanged || typeChanged || optionsChanged || answerChanged || marksChanged || negativeMarksChanged || partialRuleChanged || modelAnswerChanged;
 
           // DO NOT delete past responses! Keep previous submitted answers stored and available.
           // Update question properties. If modified, set updatedAt to now.
@@ -214,8 +239,11 @@ export const updateQuiz = async (req: Request, res: Response, next: NextFunction
               questionText: q.questionText,
               options: formattedOptions,
               order: i,
-              marks: q.marks || 1,
+              marks: qMarks,
+              negativeMarks: qNegativeMarks,
+              partialMarkingRule: qPartialRule,
               correctAnswer: q.correctAnswer || null,
+              modelAnswer: qModelAnswer,
               isPublished: q.isPublished !== undefined ? q.isPublished : true,
               ...(isModified ? { updatedAt: new Date() } : {}),
             },
@@ -229,8 +257,11 @@ export const updateQuiz = async (req: Request, res: Response, next: NextFunction
               questionText: q.questionText,
               options: formattedOptions,
               order: i,
-              marks: q.marks || 1,
+              marks: qMarks,
+              negativeMarks: qNegativeMarks,
+              partialMarkingRule: qPartialRule,
               correctAnswer: q.correctAnswer || null,
+              modelAnswer: qModelAnswer,
               isPublished: q.isPublished !== undefined ? q.isPublished : true,
             },
           });
@@ -248,6 +279,8 @@ export const updateQuiz = async (req: Request, res: Response, next: NextFunction
         ...(status !== undefined ? { status } : {}),
         ...(documentId !== undefined ? { documentId } : {}),
         ...(annotationId !== undefined ? { annotationId } : {}),
+        ...(answerRevealMode !== undefined ? { answerRevealMode } : {}),
+        ...(showLeaderboard !== undefined ? { showLeaderboard: Boolean(showLeaderboard) } : {}),
       },
       include: {
         questions: { orderBy: { order: 'asc' } },
@@ -469,9 +502,39 @@ export const submitQuiz = async (req: Request, res: Response, next: NextFunction
       // Grade the answer
       let isCorrect: boolean | null = null;
       let score = 0;
+      const qMarks = Number(question.marks) || 1;
+      const qNegative = Number(question.negativeMarks) || 0;
+
       if (question.correctAnswer) {
-        isCorrect = answerText.trim().toLowerCase() === question.correctAnswer.trim().toLowerCase();
-        score = isCorrect ? question.marks : 0;
+        if (question.type === 'MULTIPLE_CORRECT') {
+          const correctList = question.correctAnswer.split(',').map((s: string) => s.trim().toUpperCase()).filter(Boolean);
+          const userList = answerText.split(',').map((s: string) => s.trim().toUpperCase()).filter(Boolean);
+          const correctSet = new Set(correctList);
+          const userSet = new Set(userList);
+
+          const isExactMatch = correctList.length === userList.length && correctList.every((opt: string) => userSet.has(opt));
+
+          if (question.partialMarkingRule === 'NONE') {
+            isCorrect = isExactMatch;
+            score = isExactMatch ? qMarks : (qNegative > 0 ? -qNegative : 0);
+          } else if (question.partialMarkingRule === 'POSITIVE_ONLY') {
+            const correctChosen = userList.filter((opt: string) => correctSet.has(opt)).length;
+            const valPerOption = correctList.length > 0 ? qMarks / correctList.length : 0;
+            score = Math.round(correctChosen * valPerOption * 100) / 100;
+            isCorrect = isExactMatch;
+          } else {
+            // PROPORTIONAL_WITH_PENALTY
+            const correctChosen = userList.filter((opt: string) => correctSet.has(opt)).length;
+            const wrongChosen = userList.filter((opt: string) => !correctSet.has(opt)).length;
+            const valPerOption = correctList.length > 0 ? qMarks / correctList.length : 0;
+            const rawScore = (correctChosen * valPerOption) - (wrongChosen * valPerOption);
+            score = Math.max(0, Math.round(rawScore * 100) / 100);
+            isCorrect = isExactMatch;
+          }
+        } else {
+          isCorrect = answerText.trim().toLowerCase() === question.correctAnswer.trim().toLowerCase();
+          score = isCorrect ? qMarks : (qNegative > 0 ? -qNegative : 0);
+        }
         totalScore += score;
       } else if (isUnchanged && prevAns) {
         score = prevAns.score || 0;
@@ -486,6 +549,8 @@ export const submitQuiz = async (req: Request, res: Response, next: NextFunction
         score,
       });
     }
+
+    totalScore = Math.max(0, Math.round(totalScore * 100) / 100);
 
     let submission;
 
@@ -538,6 +603,21 @@ export const submitQuiz = async (req: Request, res: Response, next: NextFunction
       });
     }
 
+    try {
+      getIo().to(`project:${projectId}`).emit('submission_recorded', {
+        projectId,
+        quizId,
+        submission,
+      });
+      getIo().to(`quiz:${quizId}`).emit('submission_recorded', {
+        projectId,
+        quizId,
+        submission,
+      });
+    } catch (e) {
+      console.error('Socket emit error (submission_recorded):', e);
+    }
+
     res.status(201).json(submission);
   } catch (error) {
     next(error);
@@ -578,8 +658,13 @@ export const getMySubmission = async (req: Request, res: Response, next: NextFun
       },
     });
 
-    // If quiz is closed and user is not owner: show total marks only, completely strip questions and answers
-    if (!isOwner && quiz.status === 'CLOSED') {
+    const shouldRevealAnswers =
+      isOwner ||
+      quiz.answerRevealMode === 'IMMEDIATE' ||
+      (quiz.answerRevealMode === 'AFTER_QUIZ_CLOSED' && quiz.status === 'CLOSED');
+
+    // If quiz is closed and user is not owner and answers are NOT to be revealed: show total marks only
+    if (!isOwner && quiz.status === 'CLOSED' && !shouldRevealAnswers) {
       let totalScore: number | null = null;
       if (submission) {
         const validQuestionIds = new Set(quiz.questions.map((q) => q.id));
@@ -667,6 +752,18 @@ export const getMySubmission = async (req: Request, res: Response, next: NextFun
       submission.totalScore = submission.answers.reduce((sum, a) => sum + (a.score || 0), 0);
     }
 
+    // Filter questions depending on answer reveal policy
+    const questionsWithRevealPolicy = quiz.questions.map((q) => {
+      if (shouldRevealAnswers) {
+        return q;
+      }
+      return {
+        ...q,
+        correctAnswer: null,
+        modelAnswer: null,
+      };
+    });
+
     res.json({
       submitted: !!submission && !isOutdated,
       isOutdated,
@@ -675,6 +772,166 @@ export const getMySubmission = async (req: Request, res: Response, next: NextFun
       totalMarks,
       submission,
       questionStates,
+      quiz: {
+        ...quiz,
+        questions: questionsWithRevealPolicy,
+      },
+      showLeaderboard: quiz.showLeaderboard,
+      shouldRevealAnswers,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getQuizLeaderboard = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const projectId = req.params.projectId as string;
+    const quizId = req.params.quizId as string;
+    const userId = (req as any).user?.userId;
+
+    const { isOwner, isMember } = await checkProjectAccess(projectId, userId);
+    if (!isMember) {
+      return res.status(403).json({ message: 'Access denied to this project' });
+    }
+
+    const quiz = await prisma.quiz.findUnique({
+      where: { id: quizId },
+      include: {
+        questions: { where: { isPublished: true } },
+      },
+    });
+
+    if (!quiz || quiz.projectId !== projectId) {
+      return res.status(404).json({ message: 'Quiz not found' });
+    }
+
+    // Check visibility toggle: instructor always sees, student sees if showLeaderboard is true
+    if (!isOwner && quiz.showLeaderboard === false) {
+      return res.status(403).json({ message: 'The leaderboard is currently hidden by the instructor' });
+    }
+
+    const maxPossibleScore = quiz.questions.reduce((sum, q) => sum + (q.marks || 0), 0);
+
+    const submissions = await prisma.quizSubmission.findMany({
+      where: { quizId },
+      include: {
+        user: { select: { id: true, username: true, email: true } },
+        answers: true,
+      },
+      orderBy: [
+        { totalScore: 'desc' },
+        { submittedAt: 'asc' }, // Earliest submission breaks score ties
+      ],
+    });
+
+    const leaderboard = submissions.map((sub, index) => {
+      const score = sub.totalScore ?? 0;
+      const percentage = maxPossibleScore > 0 ? Math.round((score / maxPossibleScore) * 100) : 0;
+      return {
+        rank: index + 1,
+        userId: sub.userId,
+        username: sub.user?.username || 'Unknown',
+        email: isOwner ? sub.user?.email : undefined,
+        totalScore: score,
+        maxPossibleScore,
+        percentage,
+        submittedAt: sub.submittedAt,
+        answersCount: sub.answers?.length || 0,
+      };
+    });
+
+    res.json({
+      quizId,
+      quizTitle: quiz.title,
+      maxPossibleScore,
+      showLeaderboard: quiz.showLeaderboard,
+      leaderboard,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getStudentPerformanceTracker = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const projectId = req.params.projectId as string;
+    const userId = (req as any).user?.userId;
+    const targetUserId = (req.query.userId as string) || userId;
+
+    const { isOwner, isMember } = await checkProjectAccess(projectId, userId);
+    if (!isMember) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    // Non-owners can only view their own performance
+    if (!isOwner && targetUserId !== userId) {
+      return res.status(403).json({ message: 'You can only view your own performance history' });
+    }
+
+    // Get all quizzes in this project
+    const quizzes = await prisma.quiz.findMany({
+      where: { projectId },
+      include: {
+        questions: { where: { isPublished: true } },
+        submissions: {
+          include: {
+            user: { select: { id: true, username: true, email: true } },
+          },
+          orderBy: [
+            { totalScore: 'desc' },
+            { submittedAt: 'asc' },
+          ],
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, username: true, email: true },
+    });
+
+    const performanceRecords: any[] = [];
+
+    quizzes.forEach((quiz) => {
+      const maxMarks = quiz.questions.reduce((sum, q) => sum + (q.marks || 0), 0);
+      const subIndex = quiz.submissions.findIndex((s) => s.userId === targetUserId);
+
+      if (subIndex !== -1) {
+        const sub = quiz.submissions[subIndex];
+        const score = sub.totalScore ?? 0;
+        const percentage = maxMarks > 0 ? Math.round((score / maxMarks) * 100) : 0;
+
+        performanceRecords.push({
+          quizId: quiz.id,
+          quizTitle: quiz.title,
+          submittedAt: sub.submittedAt,
+          score,
+          totalMarks: maxMarks,
+          percentage,
+          rank: subIndex + 1,
+          totalParticipants: quiz.submissions.length,
+        });
+      }
+    });
+
+    const totalQuizzesTaken = performanceRecords.length;
+    const averageScorePercentage = totalQuizzesTaken > 0
+      ? Math.round(performanceRecords.reduce((sum, r) => sum + r.percentage, 0) / totalQuizzesTaken)
+      : 0;
+    const highestScorePercentage = totalQuizzesTaken > 0
+      ? Math.max(...performanceRecords.map((r) => r.percentage))
+      : 0;
+
+    res.json({
+      userId: targetUserId,
+      username: targetUser?.username || 'Unknown',
+      email: isOwner ? targetUser?.email : undefined,
+      totalQuizzesTaken,
+      averageScorePercentage,
+      highestScorePercentage,
+      quizzes: performanceRecords,
     });
   } catch (error) {
     next(error);
@@ -803,7 +1060,7 @@ export const getQuizAnalytics = async (req: Request, res: Response, next: NextFu
 
       // Map answer responses
       const countsMap: Record<string, number> = {};
-      if (q.type === 'MULTIPLE_CHOICE' && q.options) {
+      if ((q.type === 'MULTIPLE_CHOICE' || q.type === 'MULTIPLE_CORRECT') && q.options) {
         try {
           const opts: string[] = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
           opts.forEach((opt) => (countsMap[opt] = 0));
@@ -820,9 +1077,15 @@ export const getQuizAnalytics = async (req: Request, res: Response, next: NextFu
       });
 
       const responseDistribution = Object.entries(countsMap).map(([answerText, count]) => {
-        const isCorrect = q.correctAnswer
-          ? answerText.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase()
-          : null;
+        let isCorrect: boolean | null = null;
+        if (q.correctAnswer) {
+          if (q.type === 'MULTIPLE_CORRECT') {
+            const normalize = (s: string) => s.split(',').map(x => x.trim().toUpperCase()).filter(Boolean).sort().join(',');
+            isCorrect = normalize(answerText) === normalize(q.correctAnswer);
+          } else {
+            isCorrect = answerText.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase();
+          }
+        }
         return {
           answerText,
           count,
@@ -837,6 +1100,9 @@ export const getQuizAnalytics = async (req: Request, res: Response, next: NextFu
         type: q.type,
         marks: q.marks,
         correctAnswer: q.correctAnswer,
+        negativeMarks: q.negativeMarks,
+        partialMarkingRule: q.partialMarkingRule,
+        modelAnswer: q.modelAnswer,
         totalAnswers: totalAnsCount,
         correctCount: correctAnsCount,
         incorrectCount: incorrectAnsCount,

@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useProjects } from "@/context/ProjectContext"
-import { QuestionType } from "@/types/quiz"
+import { QuestionType, AnswerRevealMode, PartialMarkingRule } from "@/types/quiz"
 import { getQuizById, downloadQuizAnswersExcel } from "@/lib/api/quizzes"
-import { FileSpreadsheet, FileText } from "lucide-react"
+import { FileSpreadsheet, FileText, Trophy, Eye, ShieldAlert } from "lucide-react"
 import { AddQuestionsFromTextModal } from "@/components/project/AddQuestionsFromTextModal"
 import { ParsedQuestion } from "@/lib/quizTextParser"
 
@@ -20,7 +20,10 @@ interface TempQuestion {
   questionText: string
   options: string[]
   marks: number
+  negativeMarks: number
+  partialMarkingRule: PartialMarkingRule
   correctAnswer: string
+  modelAnswer: string
   isPublished: boolean
 }
 
@@ -37,6 +40,8 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [status, setStatus] = useState<"DRAFT" | "PUBLISHED" | "CLOSED">("DRAFT")
+  const [answerRevealMode, setAnswerRevealMode] = useState<AnswerRevealMode>("IMMEDIATE")
+  const [showLeaderboard, setShowLeaderboard] = useState<boolean>(true)
   const [questions, setQuestions] = useState<TempQuestion[]>([])
   
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -59,18 +64,23 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
   const hasLoadedRef = useRef(false)
   const lastSavedSnapshotRef = useRef<string>("")
 
-  const getSnapshot = (t: string, d: string, s: string, qs: TempQuestion[]) => {
+  const getSnapshot = (t: string, d: string, s: string, arm: string, sl: boolean, qs: TempQuestion[]) => {
     return JSON.stringify({
       title: t.trim(),
       description: d.trim(),
       status: s,
+      answerRevealMode: arm,
+      showLeaderboard: sl,
       questions: qs.map((q) => ({
         id: typeof q.id === "string" && !q.id.startsWith("temp-") ? q.id : null,
         type: q.type,
         questionText: q.questionText,
         options: q.options,
         marks: q.marks,
+        negativeMarks: q.negativeMarks,
+        partialMarkingRule: q.partialMarkingRule,
         correctAnswer: q.correctAnswer,
+        modelAnswer: q.modelAnswer,
         isPublished: q.isPublished,
       })),
     })
@@ -84,18 +94,25 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
           type: q.type,
           questionText: q.questionText,
           options: q.options ? JSON.parse(q.options) : [],
-          marks: q.marks,
+          marks: q.marks ?? 1,
+          negativeMarks: q.negativeMarks ?? 0,
+          partialMarkingRule: q.partialMarkingRule || "PROPORTIONAL_WITH_PENALTY",
           correctAnswer: q.correctAnswer || "",
+          modelAnswer: q.modelAnswer || "",
           isPublished: q.isPublished,
         }))
         setTitle(data.title)
         setDescription(data.description || "")
         setStatus(data.status as "DRAFT" | "PUBLISHED" | "CLOSED")
+        setAnswerRevealMode((data.answerRevealMode as AnswerRevealMode) || "IMMEDIATE")
+        setShowLeaderboard(data.showLeaderboard !== undefined ? Boolean(data.showLeaderboard) : true)
         setQuestions(loadedQuestions)
         lastSavedSnapshotRef.current = getSnapshot(
           data.title,
           data.description || "",
           data.status as "DRAFT" | "PUBLISHED" | "CLOSED",
+          (data.answerRevealMode as AnswerRevealMode) || "IMMEDIATE",
+          data.showLeaderboard !== undefined ? Boolean(data.showLeaderboard) : true,
           loadedQuestions
         )
         setLoading(false)
@@ -117,13 +134,18 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
         title: title.trim(),
         description: description.trim(),
         status,
+        answerRevealMode,
+        showLeaderboard,
         questions: questions.map((q) => ({
           ...(typeof q.id === "string" && !q.id.startsWith("temp-") ? { id: q.id } : {}),
           type: q.type,
           questionText: q.questionText,
-          options: q.type === "MULTIPLE_CHOICE" ? q.options : null,
+          options: q.type === "MULTIPLE_CHOICE" || q.type === "MULTIPLE_CORRECT" ? q.options : null,
           marks: q.marks,
+          negativeMarks: q.negativeMarks,
+          partialMarkingRule: q.partialMarkingRule,
           correctAnswer: q.correctAnswer.trim() || null,
+          modelAnswer: q.modelAnswer.trim() || null,
           isPublished: q.isPublished,
         })),
       })
@@ -139,22 +161,22 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
             }
             return q
           })
-          lastSavedSnapshotRef.current = getSnapshot(title, description, status, updatedList)
+          lastSavedSnapshotRef.current = getSnapshot(title, description, status, answerRevealMode, showLeaderboard, updatedList)
           return updatedList
         })
       } else {
-        lastSavedSnapshotRef.current = getSnapshot(title, description, status, questions)
+        lastSavedSnapshotRef.current = getSnapshot(title, description, status, answerRevealMode, showLeaderboard, questions)
       }
     } catch (error) {
       console.error("Auto-save failed", error)
       setAutoSaveStatus("error")
     }
-  }, [projectId, quizId, title, description, status, questions, updateQuiz])
+  }, [projectId, quizId, title, description, status, answerRevealMode, showLeaderboard, questions, updateQuiz])
 
   useEffect(() => {
     if (!hasLoadedRef.current) return
 
-    const currentSnapshot = getSnapshot(title, description, status, questions)
+    const currentSnapshot = getSnapshot(title, description, status, answerRevealMode, showLeaderboard, questions)
     if (currentSnapshot === lastSavedSnapshotRef.current) {
       return
     }
@@ -167,7 +189,7 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [title, description, status, questions, performAutoSave])
+  }, [title, description, status, answerRevealMode, showLeaderboard, questions, performAutoSave])
 
   const handleAddQuestion = () => {
     setQuestions([
@@ -178,7 +200,10 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
         questionText: "",
         options: ["Option 1", "Option 2"],
         marks: 1,
+        negativeMarks: 0,
+        partialMarkingRule: "PROPORTIONAL_WITH_PENALTY",
         correctAnswer: "",
+        modelAnswer: "",
         isPublished: true,
       },
     ])
@@ -190,13 +215,16 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
       type: q.type,
       questionText: q.questionText,
       options:
-        q.type === "MULTIPLE_CHOICE"
+        q.type === "MULTIPLE_CHOICE" || q.type === "MULTIPLE_CORRECT"
           ? q.options.length >= 2
             ? q.options
             : ["Option 1", "Option 2"]
           : ["Option 1", "Option 2"],
       marks: q.marks,
+      negativeMarks: 0,
+      partialMarkingRule: "PROPORTIONAL_WITH_PENALTY",
       correctAnswer: q.correctAnswer,
+      modelAnswer: "",
       isPublished: q.isPublished,
     }))
     setQuestions((prev) => [...prev, ...newQuestions])
@@ -275,13 +303,18 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
         title: title.trim(),
         description: description.trim(),
         status: finalStatus,
+        answerRevealMode,
+        showLeaderboard,
         questions: questions.map((q) => ({
           ...(typeof q.id === "string" && !q.id.startsWith("temp-") ? { id: q.id } : {}),
           type: q.type,
           questionText: q.questionText,
-          options: q.type === "MULTIPLE_CHOICE" ? q.options : null,
+          options: q.type === "MULTIPLE_CHOICE" || q.type === "MULTIPLE_CORRECT" ? q.options : null,
           marks: q.marks,
+          negativeMarks: q.negativeMarks,
+          partialMarkingRule: q.partialMarkingRule,
           correctAnswer: q.correctAnswer.trim() || null,
+          modelAnswer: q.modelAnswer.trim() || null,
           isPublished: q.isPublished,
         })),
       })
@@ -432,6 +465,37 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
                   placeholder="Quiz Description (optional)"
                   className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-black min-h-[80px] resize-none text-gray-900 placeholder-gray-500"
                 />
+
+                {/* Quiz Settings: Answer Reveal & Leaderboard */}
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2">
+                    <Eye size={15} className="text-[#a17038]" />
+                    <span className="font-semibold text-gray-700">Answer Reveal Policy:</span>
+                    <select
+                      value={answerRevealMode}
+                      onChange={(e) => setAnswerRevealMode(e.target.value as AnswerRevealMode)}
+                      className="p-1.5 border border-gray-300 rounded bg-white text-gray-900 focus:outline-none"
+                    >
+                      <option value="IMMEDIATE">Immediate (Upon Submission)</option>
+                      <option value="AFTER_QUIZ_CLOSED">After Quiz is Closed</option>
+                      <option value="MARKS_ONLY">Show Marks Only</option>
+                      <option value="NEVER">Never Reveal</option>
+                    </select>
+                  </div>
+
+                  <label className="flex items-center gap-2 cursor-pointer font-semibold text-gray-700 select-none">
+                    <input
+                      type="checkbox"
+                      checked={showLeaderboard}
+                      onChange={(e) => setShowLeaderboard(e.target.checked)}
+                      className="w-4 h-4 rounded text-[#a17038] focus:ring-[#a17038]"
+                    />
+                    <span className="flex items-center gap-1">
+                      <Trophy size={14} className="text-amber-600" />
+                      Allow Students to View Leaderboard
+                    </span>
+                  </label>
+                </div>
               </div>
 
               {/* Questions */}
@@ -503,7 +567,7 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
                         </button>
 
                         <div className="flex flex-col gap-3 pr-8">
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 flex-wrap">
                             <span className="font-semibold text-gray-700 w-6">{index + 1}.</span>
                             <select
                               value={q.type}
@@ -511,18 +575,49 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
                               className="p-2 border border-gray-300 rounded focus:outline-none bg-white text-sm text-black"
                             >
                               <option value="MULTIPLE_CHOICE">Multiple Choice</option>
+                              <option value="MULTIPLE_CORRECT">Multiple Correct</option>
                               <option value="ONE_WORD">One Word</option>
                               <option value="SHORT_ANSWER">Short Answer</option>
                             </select>
-                            <input
-                              type="number"
-                              value={q.marks}
-                              onChange={(e) => updateQuestion(q.id, "marks", parseInt(e.target.value) || 1)}
-                              className="w-20 p-2 border border-gray-300 rounded focus:outline-none text-sm text-gray-900"
-                              placeholder="Marks"
-                              min="1"
-                            />
-                            <span className="text-xs font-medium text-gray-500">Marks</span>
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="number"
+                                step="0.5"
+                                min="0.5"
+                                value={q.marks}
+                                onChange={(e) => updateQuestion(q.id, "marks", parseFloat(e.target.value) || 1)}
+                                className="w-16 p-2 border border-gray-300 rounded focus:outline-none text-sm text-gray-900 bg-white"
+                                placeholder="Marks"
+                              />
+                              <span className="text-xs font-medium text-gray-500">Marks</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 bg-rose-50/60 border border-rose-200 px-2 py-1 rounded">
+                              <ShieldAlert size={13} className="text-rose-500" />
+                              <span className="text-xs font-medium text-rose-700">Penalty:</span>
+                              <input
+                                type="number"
+                                step="0.25"
+                                min="0"
+                                value={q.negativeMarks || 0}
+                                onChange={(e) => updateQuestion(q.id, "negativeMarks", parseFloat(e.target.value) || 0)}
+                                className="w-14 p-1 border border-rose-200 rounded text-xs text-rose-900 bg-white"
+                                placeholder="0"
+                              />
+                            </div>
+                            {q.type === "MULTIPLE_CORRECT" && (
+                              <div className="flex items-center gap-1.5 bg-emerald-50/60 border border-emerald-200 px-2 py-1 rounded">
+                                <span className="text-xs font-medium text-emerald-800">Rule:</span>
+                                <select
+                                  value={q.partialMarkingRule || "PROPORTIONAL_WITH_PENALTY"}
+                                  onChange={(e) => updateQuestion(q.id, "partialMarkingRule", e.target.value as PartialMarkingRule)}
+                                  className="p-1 border border-emerald-200 rounded text-xs bg-white text-emerald-900"
+                                >
+                                  <option value="PROPORTIONAL_WITH_PENALTY">Proportional with Penalty</option>
+                                  <option value="POSITIVE_ONLY">Positive Partial Only</option>
+                                  <option value="NONE">All or Nothing</option>
+                                </select>
+                              </div>
+                            )}
                           </div>
 
                           <input
@@ -533,7 +628,7 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
                             className="w-full p-2 border border-gray-300 rounded focus:outline-none ml-9 text-gray-900 placeholder-gray-500"
                           />
 
-                          {q.type === "MULTIPLE_CHOICE" && (
+                          {(q.type === "MULTIPLE_CHOICE" || q.type === "MULTIPLE_CORRECT") && (
                             <div className="ml-9 mt-2 flex flex-col gap-2">
                               {q.options.map((opt, optIndex) => (
                                 <div key={optIndex} className="flex items-center gap-2">
@@ -578,6 +673,36 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
                                   ))}
                                 </select>
                               </div>
+                            ) : q.type === "MULTIPLE_CORRECT" ? (
+                              <div className="flex flex-col gap-1.5">
+                                <label className="text-xs font-medium text-gray-600">Correct Answers (select all that apply):</label>
+                                <div className="flex flex-wrap gap-2">
+                                  {q.options.map((_, optIndex) => {
+                                    const letter = getAlphabetLabel(optIndex)
+                                    const selected = q.correctAnswer.split(",").map(s => s.trim()).includes(letter)
+                                    return (
+                                      <button
+                                        key={optIndex}
+                                        type="button"
+                                        onClick={() => {
+                                          const current = q.correctAnswer ? q.correctAnswer.split(",").map(s => s.trim()).filter(Boolean) : []
+                                          const updated = selected
+                                            ? current.filter(l => l !== letter)
+                                            : [...current, letter].sort()
+                                          updateQuestion(q.id, "correctAnswer", updated.join(","))
+                                        }}
+                                        className={`w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold transition-colors border ${
+                                          selected
+                                            ? "bg-emerald-600 text-white border-emerald-700"
+                                            : "bg-white text-gray-700 border-gray-300 hover:border-gray-400"
+                                        }`}
+                                      >
+                                        {letter}
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                              </div>
                             ) : (
                               <input
                                 type="text"
@@ -587,6 +712,19 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
                                 className="w-full p-2 border border-gray-200 rounded focus:outline-none text-sm bg-white text-gray-900 placeholder-gray-500"
                               />
                             )}
+
+                            {/* Model Answer / Explanation */}
+                            <div className="mt-2.5">
+                              <label className="text-xs font-semibold text-gray-700 block mb-1">
+                                Model Answer / Explanation (revealed according to Answer Reveal Policy):
+                              </label>
+                              <textarea
+                                value={q.modelAnswer || ""}
+                                onChange={(e) => updateQuestion(q.id, "modelAnswer", e.target.value)}
+                                placeholder="Ideal explanation, rubric, or sample model response for students to review..."
+                                className="w-full p-2 border border-gray-200 rounded text-xs bg-white text-gray-900 placeholder-gray-400 min-h-[60px] resize-none focus:outline-none focus:ring-1 focus:ring-black"
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -639,11 +777,14 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
                       </div>
                       
                       <div className="ml-6 pointer-events-none opacity-80">
-                        {q.type === "MULTIPLE_CHOICE" && (
+                        {(q.type === "MULTIPLE_CHOICE" || q.type === "MULTIPLE_CORRECT") && (
                           <div className="flex flex-col gap-2">
+                            {q.type === "MULTIPLE_CORRECT" && (
+                              <span className="text-[11px] text-gray-500 italic mb-1">Select all that apply</span>
+                            )}
                             {q.options.map((opt, i) => (
                               <label key={i} className="flex items-center gap-2 cursor-pointer">
-                                <span className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600 flex-shrink-0">
+                                <span className={`w-6 h-6 flex items-center justify-center text-xs font-bold text-gray-600 flex-shrink-0 ${q.type === "MULTIPLE_CORRECT" ? "rounded bg-gray-200" : "rounded-full bg-gray-200"}`}>
                                   {getAlphabetLabel(i)}
                                 </span>
                                 <span className="text-gray-700 text-sm">{opt || `Option ${i + 1}`}</span>
@@ -667,6 +808,13 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
                             className="w-full p-2 border border-gray-300 rounded focus:outline-none bg-gray-50 min-h-[100px] resize-none text-sm placeholder-gray-400"
                             placeholder="Your answer..."
                           />
+                        )}
+
+                        {q.modelAnswer && (
+                          <div className="mt-2 p-2.5 bg-amber-50/70 border border-amber-200 rounded text-xs">
+                            <span className="font-semibold text-amber-900 block mb-0.5">Model Answer / Rubric:</span>
+                            <span className="text-gray-700 whitespace-pre-wrap">{q.modelAnswer}</span>
+                          </div>
                         )}
                       </div>
                     </div>

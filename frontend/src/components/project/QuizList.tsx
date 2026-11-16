@@ -9,7 +9,9 @@ import { QuizTakeModal } from "./QuizTakeModal"
 import { QuizSubmissionsModal } from "./QuizSubmissionsModal"
 import { ManageQuizModal } from "./ManageQuizModal"
 import { QuizAnalyticsModal } from "./QuizAnalyticsModal"
-import { BarChart2, FileSpreadsheet } from "lucide-react"
+import { QuizLeaderboardModal } from "./QuizLeaderboardModal"
+import { StudentPerformanceModal } from "./StudentPerformanceModal"
+import { BarChart2, FileSpreadsheet, Trophy, TrendingUp } from "lucide-react"
 import { downloadQuizAnswersExcel } from "@/lib/api/quizzes"
 
 import { useRouter } from "next/navigation"
@@ -47,6 +49,7 @@ function QuizItem({
   const [takeModalOpen, setTakeModalOpen] = useState(false)
   const [submissionsModalOpen, setSubmissionsModalOpen] = useState(false)
   const [manageModalOpen, setManageModalOpen] = useState(false)
+  const [leaderboardModalOpen, setLeaderboardModalOpen] = useState(false)
   const [downloading, setDownloading] = useState(false)
 
   const handleDownloadExcel = async () => {
@@ -198,23 +201,41 @@ function QuizItem({
               <BarChart2 size={13} />
               Analytics
             </button>
+            <button
+              onClick={() => setLeaderboardModalOpen(true)}
+              className="text-xs font-semibold text-amber-800 hover:text-amber-950 transition-colors flex items-center gap-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1 rounded"
+            >
+              <Trophy size={13} className="text-amber-600" />
+              Leaderboard
+            </button>
           </>
         ) : (
-          quiz.status === 'CLOSED' ? (
-            <button
-              onClick={() => setTakeModalOpen(true)}
-              className="text-xs font-semibold text-gray-700 hover:text-black transition-colors bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded flex items-center gap-1.5"
-            >
-              <span>🔒</span> View Result (Closed)
-            </button>
-          ) : (
-            <button
-              onClick={() => setTakeModalOpen(true)}
-              className="text-xs font-semibold text-[#a17038] hover:text-[#8a5f2e] transition-colors"
-            >
-              Take Quiz
-            </button>
-          )
+          <>
+            {quiz.status === 'CLOSED' ? (
+              <button
+                onClick={() => setTakeModalOpen(true)}
+                className="text-xs font-semibold text-gray-700 hover:text-black transition-colors bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded flex items-center gap-1.5"
+              >
+                <span>🔒</span> View Result (Closed)
+              </button>
+            ) : (
+              <button
+                onClick={() => setTakeModalOpen(true)}
+                className="text-xs font-semibold text-[#a17038] hover:text-[#8a5f2e] transition-colors"
+              >
+                Take Quiz
+              </button>
+            )}
+            {(quiz.showLeaderboard !== false || quiz.status === 'CLOSED') && (
+              <button
+                onClick={() => setLeaderboardModalOpen(true)}
+                className="text-xs font-semibold text-amber-800 hover:text-amber-950 transition-colors flex items-center gap-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1 rounded"
+              >
+                <Trophy size={13} className="text-amber-600" />
+                Leaderboard
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -241,6 +262,15 @@ function QuizItem({
           onClose={() => setManageModalOpen(false)}
         />
       )}
+
+      {leaderboardModalOpen && (
+        <QuizLeaderboardModal
+          projectId={projectId}
+          quizId={quiz.id}
+          quizTitle={quiz.title}
+          onClose={() => setLeaderboardModalOpen(false)}
+        />
+      )}
     </div>
   )
 }
@@ -256,6 +286,7 @@ export function QuizList({ projectId, isOwner, currentUserId }: Props) {
   const { joinProject } = useSocket()
   const quizzes = quizzesForProject(projectId)
   const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [performanceModalOpen, setPerformanceModalOpen] = useState(false)
 
   useEffect(() => {
     if (projectId) {
@@ -266,8 +297,16 @@ export function QuizList({ projectId, isOwner, currentUserId }: Props) {
 
   return (
     <div className="flex flex-col gap-6 mt-4">
-      {isOwner && (
-        <div className="flex justify-end">
+      <div className="flex justify-between items-center gap-3 flex-wrap">
+        <button
+          onClick={() => setPerformanceModalOpen(true)}
+          className="px-4 py-2 text-xs font-semibold rounded-lg bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200 flex items-center gap-1.5 transition-colors shadow-xs"
+        >
+          <TrendingUp size={14} className="text-blue-600" />
+          <span>My Performance Tracker</span>
+        </button>
+
+        {isOwner && (
           <button
             onClick={() => setCreateModalOpen(true)}
             className="px-5 py-2 text-sm font-semibold rounded hover:opacity-95 transition-opacity"
@@ -275,8 +314,8 @@ export function QuizList({ projectId, isOwner, currentUserId }: Props) {
           >
             Create New Quiz
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="flex flex-col gap-4">
         {quizzes.length === 0 ? (
@@ -300,6 +339,14 @@ export function QuizList({ projectId, isOwner, currentUserId }: Props) {
         <CreateQuizModal
           projectId={projectId}
           onClose={() => setCreateModalOpen(false)}
+        />
+      )}
+
+      {performanceModalOpen && (
+        <StudentPerformanceModal
+          projectId={projectId}
+          userId={currentUserId}
+          onClose={() => setPerformanceModalOpen(false)}
         />
       )}
     </div>

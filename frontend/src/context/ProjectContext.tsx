@@ -43,8 +43,8 @@ type ProjectContextValue = {
   updateAssignmentStatus: (projectId: string, assignmentId: string, userId: string, status?: string, grade?: string) => Promise<void>
   quizzesForProject: (projectId: string) => Quiz[]
   fetchQuizzes: (projectId: string) => Promise<Quiz[]>
-  createQuiz: (projectId: string, payload: { title: string; description: string; status: string; questions: any[] }) => Promise<Quiz>
-  updateQuiz: (projectId: string, quizId: string, payload: { title: string; description: string; status: string; questions?: any[] }) => Promise<Quiz>
+  createQuiz: (projectId: string, payload: { title: string; description?: string; status?: string; questions: any[]; answerRevealMode?: any; showLeaderboard?: boolean; documentId?: string | null; annotationId?: string | null }) => Promise<Quiz>
+  updateQuiz: (projectId: string, quizId: string, payload: { title?: string; description?: string; status?: string; questions?: any[]; answerRevealMode?: any; showLeaderboard?: boolean; documentId?: string | null; annotationId?: string | null }) => Promise<Quiz>
   deleteQuiz: (projectId: string, quizId: string) => Promise<void>
   publishQuestion: (projectId: string, quizId: string, questionId: string, isPublished: boolean) => Promise<any>
 }
