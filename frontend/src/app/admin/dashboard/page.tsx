@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import {
   fetchAdminStats,
   fetchAdminProjects,
@@ -18,8 +19,6 @@ import {
   Crown,
   Users,
   FolderLock,
-  FileCheck2,
-  Settings,
   LogOut,
   RefreshCw,
   Search,
@@ -28,6 +27,8 @@ import {
   Globe,
   Sliders,
   X,
+  ArrowLeft,
+  ExternalLink,
 } from "lucide-react"
 
 export default function AdminDashboardPage() {
@@ -70,7 +71,11 @@ export default function AdminDashboardPage() {
         setUsers(usersData)
       }
     } catch (err: any) {
-      if (err.message?.includes("Forbidden") || err.message?.includes("Access denied") || err.message?.includes("Invalid or missing token")) {
+      if (
+        err.message?.includes("Forbidden") ||
+        err.message?.includes("Access denied") ||
+        err.message?.includes("Invalid or missing token")
+      ) {
         router.push("/admin/login")
         return
       }
@@ -147,41 +152,48 @@ export default function AdminDashboardPage() {
   )
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-gray-50/70 text-gray-900 flex flex-col font-sans">
       {/* Top Navigation */}
-      <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md px-6 py-4 flex items-center justify-between sticky top-0 z-40">
+      <header className="border-b border-gray-200 bg-white/95 backdrop-blur-md px-6 py-4 flex items-center justify-between sticky top-0 z-40 shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center shadow-md">
-            <ShieldCheck size={22} className="text-white" />
+          <div className="w-10 h-10 rounded-xl bg-[#a17038] text-white flex items-center justify-center shadow-sm">
+            <ShieldCheck size={22} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-base font-extrabold text-white tracking-tight">Admin Console</h1>
+              <h1 className="text-base font-extrabold text-gray-900 tracking-tight">Admin Console</h1>
               <span
-                className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
                   stats?.isSuperAdmin
-                    ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                    : "bg-indigo-500/10 text-indigo-400 border-indigo-500/20"
+                    ? "bg-amber-50 text-amber-800 border-amber-200"
+                    : "bg-[#a17038]/10 text-[#a17038] border-[#a17038]/20"
                 }`}
               >
                 {stats?.isSuperAdmin ? "Superadmin" : "Admin"}
               </span>
             </div>
-            <p className="text-[11px] text-slate-400">Control center for project access & designated administrators</p>
+            <p className="text-[11px] text-gray-500">Control center for project access & designated administrators</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          <Link
+            href="/home"
+            className="px-3 py-1.5 text-xs font-semibold text-gray-700 hover:text-black hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
+          >
+            <ArrowLeft size={14} />
+            <span className="hidden sm:inline">Back to Exegesis</span>
+          </Link>
           <button
             onClick={loadData}
-            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+            className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200"
             title="Refresh dashboard"
           >
-            <RefreshCw size={16} />
+            <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
           </button>
           <button
             onClick={handleLogout}
-            className="px-3 py-1.5 text-xs font-semibold text-rose-400 hover:text-white hover:bg-rose-600/20 border border-rose-500/20 rounded-lg transition-colors flex items-center gap-1.5"
+            className="px-3 py-1.5 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg transition-colors flex items-center gap-1.5"
           >
             <LogOut size={14} />
             <span>Sign Out</span>
@@ -192,111 +204,123 @@ export default function AdminDashboardPage() {
       {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
         {error && (
-          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold flex items-center gap-2">
-            <AlertTriangle size={16} />
+          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2 shadow-xs">
+            <AlertTriangle size={16} className="flex-shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 flex items-center justify-between shadow-xs">
             <div>
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block">
                 {stats?.isSuperAdmin ? "Total Platform Users" : "Designated Users"}
               </span>
-              <span className="text-2xl font-black text-white mt-1 block">
+              <span className="text-2xl font-black text-gray-900 mt-1 block">
                 {loading ? "..." : stats?.totalUsers || 0}
               </span>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
               <Users size={20} />
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 flex items-center justify-between shadow-xs">
             <div>
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block">
                 Superadmins
               </span>
-              <span className="text-2xl font-black text-amber-400 mt-1 block">
+              <span className="text-2xl font-black text-[#a17038] mt-1 block">
                 {loading ? "..." : stats?.totalSuperAdmins || 0}
               </span>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-100">
               <Crown size={20} />
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 flex items-center justify-between shadow-xs">
             <div>
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block">
                 Designated Admins
               </span>
-              <span className="text-2xl font-black text-indigo-400 mt-1 block">
+              <span className="text-2xl font-black text-[#a17038] mt-1 block">
                 {loading ? "..." : stats?.totalAdmins || 0}
               </span>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-[#a17038]/10 text-[#a17038] flex items-center justify-center border border-[#a17038]/20">
               <ShieldCheck size={20} />
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 flex items-center justify-between shadow-xs">
             <div>
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block">
                 {stats?.isSuperAdmin ? "All Projects" : "Managed Projects"}
               </span>
-              <span className="text-2xl font-black text-white mt-1 block">
+              <span className="text-2xl font-black text-gray-900 mt-1 block">
                 {loading ? "..." : stats?.totalProjects || 0}
               </span>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
               <FolderLock size={20} />
             </div>
           </div>
         </div>
 
         {/* Tab Selector */}
-        <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+        <div className="flex items-center gap-2 border-b border-gray-200 pb-2">
           <button
             onClick={() => setActiveTab("projects")}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
               activeTab === "projects"
-                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
-                : "text-slate-400 hover:text-white hover:bg-slate-900"
+                ? "bg-[#a17038] text-white shadow-xs"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
             }`}
           >
             <FolderLock size={15} />
             <span>Project Access Rules</span>
-            <span className="bg-black/20 px-2 py-0.5 rounded-full text-[10px]">{projects.length}</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                activeTab === "projects" ? "bg-white/20 text-white" : "bg-gray-200 text-gray-700"
+              }`}
+            >
+              {projects.length}
+            </span>
           </button>
 
           {stats?.isSuperAdmin && (
             <>
               <button
                 onClick={() => setActiveTab("users")}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
                   activeTab === "users"
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
-                    : "text-slate-400 hover:text-white hover:bg-slate-900"
+                    ? "bg-[#a17038] text-white shadow-xs"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                 }`}
               >
                 <Users size={15} />
-                <span>Superadmin: User & Role Management</span>
-                <span className="bg-black/20 px-2 py-0.5 rounded-full text-[10px]">{users.length}</span>
+                <span>Superadmin: Users &amp; Roles</span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                    activeTab === "users" ? "bg-white/20 text-white" : "bg-gray-200 text-gray-700"
+                  }`}
+                >
+                  {users.length}
+                </span>
               </button>
 
               <button
                 onClick={() => setActiveTab("settings")}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
                   activeTab === "settings"
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
-                    : "text-slate-400 hover:text-white hover:bg-slate-900"
+                    ? "bg-[#a17038] text-white shadow-xs"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                 }`}
               >
                 <Globe size={15} />
-                <span>Superadmin: Platform-Wide Restrictions</span>
+                <span>Superadmin: Platform Restrictions</span>
               </button>
             </>
           )}
@@ -307,73 +331,76 @@ export default function AdminDashboardPage() {
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="text-base font-bold text-white">Project Email Login & Join Control</h2>
-                <p className="text-xs text-slate-400">
+                <h2 className="text-base font-bold text-gray-900">Project Email Login &amp; Join Control</h2>
+                <p className="text-xs text-gray-500">
                   Restrict entry to your project so only students with designated email patterns (e.g.{" "}
-                  <code className="text-amber-400 bg-slate-900 px-1 py-0.5 rounded">2023*@dau.ac.in</code>) can join.
+                  <code className="text-[#a17038] font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                    2023*@dau.ac.in
+                  </code>
+                  ) can join.
                 </p>
               </div>
 
               <div className="relative w-full sm:w-64">
-                <Search size={14} className="absolute left-3 top-2.5 text-slate-500" />
+                <Search size={14} className="absolute left-3 top-2.5 text-gray-400" />
                 <input
                   type="text"
                   value={projectSearch}
                   onChange={(e) => setProjectSearch(e.target.value)}
                   placeholder="Filter projects..."
-                  className="w-full pl-9 pr-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full pl-9 pr-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[#a17038] shadow-xs"
                 />
               </div>
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-semibold uppercase tracking-wider text-[10px]">
                   <tr>
-                    <th className="py-3 px-4">Project Name</th>
-                    <th className="py-3 px-4">Owner</th>
-                    <th className="py-3 px-4">Allowed Email Pattern(s)</th>
-                    <th className="py-3 px-4 text-center">Members</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
+                    <th className="py-3.5 px-4">Project Name</th>
+                    <th className="py-3.5 px-4">Owner</th>
+                    <th className="py-3.5 px-4">Allowed Email Pattern(s)</th>
+                    <th className="py-3.5 px-4 text-center">Members</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
+                <tbody className="divide-y divide-gray-100">
                   {filteredProjects.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-12 text-center text-slate-500">
+                      <td colSpan={5} className="py-12 text-center text-gray-400">
                         No projects found.
                       </td>
                     </tr>
                   ) : (
                     filteredProjects.map((proj) => (
-                      <tr key={proj.id} className="hover:bg-slate-800/30 transition-colors">
-                        <td className="py-3 px-4 font-bold text-white">{proj.name}</td>
-                        <td className="py-3 px-4">
-                          <span className="font-semibold text-slate-300 block">{proj.owner?.username}</span>
-                          <span className="text-[10px] text-slate-500 block truncate max-w-xs">
+                      <tr key={proj.id} className="hover:bg-gray-50/60 transition-colors">
+                        <td className="py-3.5 px-4 font-bold text-gray-900">{proj.name}</td>
+                        <td className="py-3.5 px-4">
+                          <span className="font-semibold text-gray-800 block">{proj.owner?.username}</span>
+                          <span className="text-[10px] text-gray-400 block truncate max-w-xs">
                             {proj.owner?.email}
                           </span>
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-3.5 px-4">
                           {proj.allowedEmailPatterns ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono">
-                              <ShieldCheck size={12} />
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 font-mono">
+                              <ShieldCheck size={12} className="text-[#a17038]" />
                               {proj.allowedEmailPatterns}
                             </span>
                           ) : (
-                            <span className="text-slate-500 italic text-[11px]">Unrestricted (Any authenticated user)</span>
+                            <span className="text-gray-400 italic text-[11px]">Unrestricted (Any authenticated user)</span>
                           )}
                         </td>
-                        <td className="py-3 px-4 text-center text-slate-300 font-semibold">
+                        <td className="py-3.5 px-4 text-center text-gray-700 font-semibold">
                           {proj._count?.members || 1}
                         </td>
-                        <td className="py-3 px-4 text-right">
+                        <td className="py-3.5 px-4 text-right">
                           <button
                             onClick={() => {
                               setEditingProject(proj)
                               setEmailPatternInput(proj.allowedEmailPatterns || "")
                             }}
-                            className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-semibold text-xs transition-colors shadow-sm inline-flex items-center gap-1.5"
+                            className="px-3 py-1.5 bg-[#a17038] hover:bg-[#8c5f2b] text-white rounded-lg font-medium text-xs transition-colors shadow-xs inline-flex items-center gap-1.5"
                           >
                             <Sliders size={12} />
                             <span>Configure Pattern</span>
@@ -393,39 +420,39 @@ export default function AdminDashboardPage() {
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="text-base font-bold text-white">System Users & Designated Admin Roles</h2>
-                <p className="text-xs text-slate-400">
+                <h2 className="text-base font-bold text-gray-900">System Users &amp; Designated Admin Roles</h2>
+                <p className="text-xs text-gray-500">
                   Assign or revoke Administrator status. Only Superadmins have permission to modify roles.
                 </p>
               </div>
 
               <div className="relative w-full sm:w-64">
-                <Search size={14} className="absolute left-3 top-2.5 text-slate-500" />
+                <Search size={14} className="absolute left-3 top-2.5 text-gray-400" />
                 <input
                   type="text"
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
                   placeholder="Filter users..."
-                  className="w-full pl-9 pr-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full pl-9 pr-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[#a17038] shadow-xs"
                 />
               </div>
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-semibold uppercase tracking-wider text-[10px]">
                   <tr>
-                    <th className="py-3 px-4">User</th>
-                    <th className="py-3 px-4">Email Address</th>
-                    <th className="py-3 px-4 text-center">Current Role</th>
-                    <th className="py-3 px-4 text-center">Status</th>
-                    <th className="py-3 px-4 text-right">Assign Designated Role</th>
+                    <th className="py-3.5 px-4">User</th>
+                    <th className="py-3.5 px-4">Email Address</th>
+                    <th className="py-3.5 px-4 text-center">Current Role</th>
+                    <th className="py-3.5 px-4 text-center">Status</th>
+                    <th className="py-3.5 px-4 text-right">Assign Designated Role</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
+                <tbody className="divide-y divide-gray-100">
                   {filteredUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-12 text-center text-slate-500">
+                      <td colSpan={5} className="py-12 text-center text-gray-400">
                         No users found.
                       </td>
                     </tr>
@@ -435,38 +462,38 @@ export default function AdminDashboardPage() {
                         user.email === "202301131@dau.ac.in" || user.email === "202301451@dau.ac.in"
 
                       return (
-                        <tr key={user.id} className="hover:bg-slate-800/30 transition-colors">
-                          <td className="py-3 px-4 font-bold text-white flex items-center gap-2">
-                            {user.systemRole === "SUPERADMIN" && <Crown size={14} className="text-amber-400" />}
-                            {user.systemRole === "ADMIN" && <ShieldCheck size={14} className="text-indigo-400" />}
+                        <tr key={user.id} className="hover:bg-gray-50/60 transition-colors">
+                          <td className="py-3.5 px-4 font-bold text-gray-900 flex items-center gap-2">
+                            {user.systemRole === "SUPERADMIN" && <Crown size={14} className="text-[#a17038]" />}
+                            {user.systemRole === "ADMIN" && <ShieldCheck size={14} className="text-blue-600" />}
                             <span>{user.username}</span>
                           </td>
-                          <td className="py-3 px-4 text-slate-300 font-mono text-[11px]">{user.email}</td>
-                          <td className="py-3 px-4 text-center">
+                          <td className="py-3.5 px-4 text-gray-600 font-mono text-[11px]">{user.email}</td>
+                          <td className="py-3.5 px-4 text-center">
                             <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                                 user.systemRole === "SUPERADMIN"
-                                  ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                  ? "bg-amber-50 text-amber-800 border-amber-200"
                                   : user.systemRole === "ADMIN"
-                                  ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20"
-                                  : "bg-slate-800 text-slate-400 border-slate-700"
+                                  ? "bg-blue-50 text-blue-800 border-blue-200"
+                                  : "bg-gray-100 text-gray-600 border-gray-200"
                               }`}
                             >
                               {user.systemRole}
                             </span>
                           </td>
-                          <td className="py-3 px-4 text-center">
+                          <td className="py-3.5 px-4 text-center">
                             {user.isVerified ? (
-                              <span className="text-emerald-400 font-semibold text-[10px] flex items-center justify-center gap-1">
+                              <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold text-[10px] inline-flex items-center gap-1">
                                 <CheckCircle2 size={11} /> Verified
                               </span>
                             ) : (
-                              <span className="text-slate-500 text-[10px]">Unverified</span>
+                              <span className="text-gray-400 text-[10px]">Unverified</span>
                             )}
                           </td>
-                          <td className="py-3 px-4 text-right">
+                          <td className="py-3.5 px-4 text-right">
                             {isDesignatedSuper ? (
-                              <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20">
+                              <span className="text-[10px] text-amber-900 font-bold bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200">
                                 Permanent Superadmin
                               </span>
                             ) : (
@@ -475,7 +502,7 @@ export default function AdminDashboardPage() {
                                 onChange={(e) =>
                                   handleRoleChange(user.id, e.target.value as "USER" | "ADMIN" | "SUPERADMIN")
                                 }
-                                className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                                className="bg-white border border-gray-300 rounded-lg px-2.5 py-1 text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#a17038] cursor-pointer shadow-xs"
                               >
                                 <option value="USER">User (Normal student)</option>
                                 <option value="ADMIN">Admin (Project Admin)</option>
@@ -495,13 +522,13 @@ export default function AdminDashboardPage() {
 
         {/* Tab 3: Superadmin Platform-Wide Restrictions */}
         {activeTab === "settings" && stats?.isSuperAdmin && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6 max-w-2xl">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-6 max-w-2xl shadow-xs">
             <div>
-              <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                <Globe size={18} className="text-indigo-400" />
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <Globe size={18} className="text-[#a17038]" />
                 <span>Platform-Wide Email Login Restrictions</span>
               </h2>
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-xs text-gray-500 mt-1">
                 Configure a mandatory platform-wide email policy. If enabled, only emails matching this pattern can
                 register or sign in on the entire platform.
               </p>
@@ -509,7 +536,7 @@ export default function AdminDashboardPage() {
 
             <form onSubmit={handleSavePlatformPattern} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider">
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wider">
                   Allowed Email Pattern(s)
                 </label>
                 <input
@@ -517,17 +544,17 @@ export default function AdminDashboardPage() {
                   value={platformPatternInput}
                   onChange={(e) => setPlatformPatternInput(e.target.value)}
                   placeholder="e.g. *@dau.ac.in, *@*.dau.ac.in"
-                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#a17038]/30 focus:border-[#a17038] font-mono shadow-xs"
                 />
-                <p className="text-[11px] text-slate-500 mt-1.5">
+                <p className="text-[11px] text-gray-500 mt-1.5">
                   Leave blank to allow any email domain. Multiple patterns can be separated by commas.
                 </p>
               </div>
 
-              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-300 flex items-start gap-2">
-                <AlertTriangle size={15} className="flex-shrink-0 mt-0.5" />
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-start gap-2">
+                <AlertTriangle size={15} className="flex-shrink-0 mt-0.5 text-amber-700" />
                 <span>
-                  Superadmins (<code className="font-bold">202301131@dau.ac.in</code> &{" "}
+                  Superadmins (<code className="font-bold">202301131@dau.ac.in</code> &amp;{" "}
                   <code className="font-bold">202301451@dau.ac.in</code>) are permanently exempt from email blocks.
                 </span>
               </div>
@@ -535,7 +562,7 @@ export default function AdminDashboardPage() {
               <button
                 type="submit"
                 disabled={savingPlatform}
-                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs shadow-md transition-all disabled:opacity-50"
+                className="px-5 py-2.5 bg-[#a17038] hover:bg-[#8c5f2b] text-white rounded-xl font-bold text-xs shadow-xs transition-all disabled:opacity-50"
               >
                 {savingPlatform ? "Saving Policy..." : "Update Platform Policy"}
               </button>
@@ -546,19 +573,19 @@ export default function AdminDashboardPage() {
 
       {/* Edit Project Allowed Email Patterns Modal */}
       {editingProject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-5 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-lg p-6 space-y-5 shadow-2xl relative">
             <div className="flex justify-between items-start">
               <div>
-                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest block mb-0.5">
+                <span className="text-[10px] font-bold text-[#a17038] uppercase tracking-widest block mb-0.5">
                   Access Control
                 </span>
-                <h3 className="text-lg font-bold text-white">Configure Project Email Pattern</h3>
-                <p className="text-xs text-slate-400 mt-0.5">{editingProject.name}</p>
+                <h3 className="text-lg font-bold text-gray-900">Configure Project Email Pattern</h3>
+                <p className="text-xs text-gray-500 mt-0.5">{editingProject.name}</p>
               </div>
               <button
                 onClick={() => setEditingProject(null)}
-                className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <X size={18} />
               </button>
@@ -566,7 +593,7 @@ export default function AdminDashboardPage() {
 
             <form onSubmit={handleSaveProjectPattern} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider">
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wider">
                   Allowed Email Pattern
                 </label>
                 <input
@@ -574,51 +601,57 @@ export default function AdminDashboardPage() {
                   value={emailPatternInput}
                   onChange={(e) => setEmailPatternInput(e.target.value)}
                   placeholder="e.g. 2023*@dau.ac.in"
-                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#a17038]/30 focus:border-[#a17038] font-mono shadow-xs"
                 />
               </div>
 
               {/* Live Pattern Matching Preview */}
-              <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-2 text-xs">
-                <span className="font-semibold text-slate-400 block text-[11px] uppercase tracking-wider">
+              <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-xl space-y-2 text-xs">
+                <span className="font-semibold text-gray-600 block text-[11px] uppercase tracking-wider">
                   Pattern Behavior Preview:
                 </span>
                 <div className="space-y-1 font-mono text-[11px]">
                   <div className="flex items-center justify-between py-0.5">
-                    <span className="text-slate-300">202301131@dau.ac.in</span>
-                    <span className="text-emerald-400 font-bold">Allowed</span>
+                    <span className="text-gray-700">202301131@dau.ac.in</span>
+                    <span className="text-emerald-700 font-bold">Allowed</span>
                   </div>
                   <div className="flex items-center justify-between py-0.5">
-                    <span className="text-slate-300">202301451@dau.ac.in</span>
-                    <span className="text-emerald-400 font-bold">Allowed</span>
+                    <span className="text-gray-700">202301451@dau.ac.in</span>
+                    <span className="text-emerald-700 font-bold">Allowed</span>
                   </div>
                   <div className="flex items-center justify-between py-0.5">
-                    <span className="text-slate-300">202401001@dau.ac.in</span>
-                    <span className={emailPatternInput.includes("2023*") ? "text-rose-400 font-bold" : "text-emerald-400 font-bold"}>
+                    <span className="text-gray-700">202401001@dau.ac.in</span>
+                    <span
+                      className={
+                        emailPatternInput.includes("2023*")
+                          ? "text-rose-600 font-bold"
+                          : "text-emerald-700 font-bold"
+                      }
+                    >
                       {emailPatternInput.includes("2023*") ? "Blocked" : "Allowed"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between py-0.5">
-                    <span className="text-slate-300">student@gmail.com</span>
-                    <span className={emailPatternInput ? "text-rose-400 font-bold" : "text-emerald-400 font-bold"}>
+                    <span className="text-gray-700">student@gmail.com</span>
+                    <span className={emailPatternInput ? "text-rose-600 font-bold" : "text-emerald-700 font-bold"}>
                       {emailPatternInput ? "Blocked" : "Allowed"}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => setEditingProject(null)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold text-xs transition-colors"
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium text-xs transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={savingPattern}
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs transition-colors shadow-md disabled:opacity-50"
+                  className="px-5 py-2 bg-[#a17038] hover:bg-[#8c5f2b] text-white rounded-xl font-bold text-xs transition-colors shadow-xs disabled:opacity-50"
                 >
                   {savingPattern ? "Saving..." : "Save Access Pattern"}
                 </button>

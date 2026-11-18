@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { adminLogin } from '../controllers/authController';
+import { adminLogin, adminGoogleLogin } from '../controllers/authController';
 import { adminMiddleware, superAdminMiddleware } from '../middleware/authMiddleware';
 import {
   getAdminStats,
@@ -15,6 +15,7 @@ const router = Router();
 
 // Public Admin Auth
 router.post('/login', adminLogin);
+router.post('/google-login', adminGoogleLogin);
 
 // Protected Admin Endpoints (ADMIN and SUPERADMIN)
 router.get('/stats', adminMiddleware, getAdminStats);

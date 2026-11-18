@@ -70,6 +70,29 @@ export async function adminLogin(email: string, password: string) {
   return data;
 }
 
+export async function adminGoogleLogin(googleToken: string) {
+  const res = await fetch(`${API_BASE}/admin/google-login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: googleToken }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.error?.message || errorData?.error || 'Admin Google login failed');
+  }
+
+  const data = await res.json();
+  if (data.accessToken) {
+    const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    document.cookie = `accessToken=${data.accessToken}; path=/; max-age=3600; SameSite=Strict${isSecure ? '; Secure' : ''}`;
+    if (data.refreshToken) {
+      document.cookie = `refreshToken=${data.refreshToken}; path=/; max-age=${7 * 86400}; SameSite=Strict${isSecure ? '; Secure' : ''}`;
+    }
+  }
+  return data;
+}
+
 export async function fetchAdminStats(): Promise<AdminStats> {
   const res = await authFetch(`${API_BASE}/admin/stats`);
   if (!res.ok) {

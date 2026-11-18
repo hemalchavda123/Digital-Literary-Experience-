@@ -773,3 +773,126 @@ export const adminLogin = async (req: Request, res: Response): Promise<void> => 
     });
   }
 };
+
+/**
+ * Admin portal Google login
+ * POST /api/admin/google-login
+ * Body: { token }
+ * ONLY users designated as ADMIN or SUPERADMIN are permitted.
+ */
+export const adminGoogleLogin = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      res.status(400).json({
+        error: {
+          message: 'Google token is required',
+          code: 'VALIDATION_ERROR',
+        },
+      });
+      return;
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email) {
+      res.status(401).json({
+        error: {
+          message: 'Invalid Google token',
+          code: 'INVALID_TOKEN',
+        },
+      });
+      return;
+    }
+
+    const cleanEmail = payload.email.trim().toLowerCase();
+    const DESIGNATED_SUPERADMINS = ['202301131@dau.ac.in', '202301451@dau.ac.in'];
+
+    let user = await userService.findUserByEmail(cleanEmail);
+
+    if (!user) {
+      // If the email is a designated superadmin, create account automatically
+      if (DESIGNATED_SUPERADMINS.includes(cleanEmail)) {
+        const baseUsername = cleanEmail.split('@')[0];
+        let finalUsername = baseUsername;
+        let counter = 1;
+        while (await userService.findUserByUsername(finalUsername)) {
+          finalUsername = `${baseUsername}${counter}`;
+          counter++;
+        }
+        const randomPassword = crypto.randomBytes(16).toString('hex');
+        const hashedPassword = await passwordService.hashPassword(randomPassword);
+
+        const newUser = await prisma.user.create({
+          data: {
+            email: cleanEmail,
+            username: finalUsername,
+            password: hashedPassword,
+            systemRole: 'SUPERADMIN' as any,
+          },
+        });
+        user = newUser as any;
+      } else {
+        res.status(403).json({
+          error: {
+            message: 'Access denied: No administrator account found for this Google email.',
+            code: 'FORBIDDEN_NOT_ADMIN',
+          },
+        });
+        return;
+      }
+    }
+
+    // Auto-promote designated superadmins if their account was previously USER
+    if (DESIGNATED_SUPERADMINS.includes(cleanEmail) && user && user.systemRole !== 'SUPERADMIN') {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { systemRole: 'SUPERADMIN' as any },
+      });
+      user = await userService.findUserByEmail(cleanEmail);
+    }
+
+    // Verify systemRole is ADMIN or SUPERADMIN
+    if (user?.systemRole !== 'ADMIN' && user?.systemRole !== 'SUPERADMIN') {
+      res.status(403).json({
+        error: {
+          message: 'Access denied: You do not have administrator permissions.',
+          code: 'FORBIDDEN_NOT_ADMIN',
+        },
+      });
+      return;
+    }
+
+    // Generate tokens
+    const jwt = jwtService();
+    const accessToken = jwt.generateAccessToken({
+      userId: user.id,
+      email: user.email,
+      username: user.username,
+      systemRole: user.systemRole as any,
+    });
+    const refreshToken = jwt.generateRefreshToken({
+      userId: user.id,
+    });
+
+    const { password: _, ...userWithoutPassword } = user;
+    res.json({
+      accessToken,
+      refreshToken,
+      user: userWithoutPassword,
+    });
+  } catch (error) {
+    console.error('Admin Google login error:', error);
+    res.status(500).json({
+      error: {
+        message: 'An unexpected error occurred during Google authentication',
+        code: 'INTERNAL_ERROR',
+      },
+    });
+  }
+};
