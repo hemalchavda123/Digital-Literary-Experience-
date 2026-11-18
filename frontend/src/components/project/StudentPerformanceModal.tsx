@@ -254,7 +254,7 @@ export function StudentPerformanceModal({ projectId, userId, studentName, onClos
                       1 attempt recorded: <strong className="text-gray-900">{quizzes[0].quizTitle}</strong> ({quizzes[0].percentage}%)
                     </p>
                     <p className="text-[11px] text-gray-400 text-center">
-                      Complete at least one more quiz to plot your score trajectory curve over time.
+                      Complete at least one more quiz to plot the score trajectory curve over time.
                     </p>
                   </div>
                 ) : (
@@ -265,7 +265,7 @@ export function StudentPerformanceModal({ projectId, userId, studentName, onClos
                     </div>
                     <h4 className="text-xs font-bold text-gray-800">Trajectory Line Chart Waiting For Data</h4>
                     <p className="text-[11px] text-gray-400 max-w-sm mt-1">
-                      Your score progress and ranking trends will be automatically graphed here chronologically once you take and submit quizzes in this project.
+                      Score progress and ranking trends will be automatically graphed here chronologically once quizzes are submitted in this project.
                     </p>
                   </div>
                 )}
@@ -293,7 +293,7 @@ export function StudentPerformanceModal({ projectId, userId, studentName, onClos
                               No quiz attempts recorded yet
                             </span>
                             <span className="text-[11px] text-gray-400 max-w-sm">
-                              Take any published quiz in this project to track your score history and performance breakdown.
+                              Take and submit any published quiz in this project to record score history and performance breakdown.
                             </span>
                           </div>
                         </td>

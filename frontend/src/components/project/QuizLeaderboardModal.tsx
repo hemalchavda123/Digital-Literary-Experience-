@@ -4,7 +4,8 @@ import { useState, useEffect } from "react"
 import { getQuizLeaderboard } from "@/lib/api/quizzes"
 import { LeaderboardEntry } from "@/types/quiz"
 import { useSocket } from "@/context/SocketContext"
-import { Trophy, Medal, Award, Clock, Users, X, RefreshCw } from "lucide-react"
+import { Trophy, Medal, Award, Clock, Users, X, RefreshCw, TrendingUp } from "lucide-react"
+import { StudentPerformanceModal } from "./StudentPerformanceModal"
 
 interface Props {
   projectId: string
@@ -18,6 +19,7 @@ export function QuizLeaderboardModal({ projectId, quizId, quizTitle, onClose }: 
   const [maxPossibleScore, setMaxPossibleScore] = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedStudent, setSelectedStudent] = useState<{ userId: string; username: string } | null>(null)
   const { socket } = useSocket()
 
   const fetchLeaderboard = async () => {
@@ -210,7 +212,19 @@ export function QuizLeaderboardModal({ projectId, quizId, quizTitle, onClose }: 
                           )}
                         </td>
                         <td className="py-2.5 px-3 font-semibold text-gray-900">
-                          {entry.username}
+                          <div className="flex items-center gap-2">
+                            <span>{entry.username}</span>
+                            {entry.email && (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedStudent({ userId: entry.userId, username: entry.username })}
+                                className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded border border-indigo-200 transition-colors flex items-center gap-0.5"
+                                title="View student trajectory"
+                              >
+                                <TrendingUp size={10} /> Stats
+                              </button>
+                            )}
+                          </div>
                           {entry.email && (
                             <span className="block text-[10px] text-gray-400 font-normal truncate max-w-xs">
                               {entry.email}
@@ -264,6 +278,15 @@ export function QuizLeaderboardModal({ projectId, quizId, quizTitle, onClose }: 
           </button>
         </div>
       </div>
+
+      {selectedStudent && (
+        <StudentPerformanceModal
+          projectId={projectId}
+          userId={selectedStudent.userId}
+          studentName={selectedStudent.username}
+          onClose={() => setSelectedStudent(null)}
+        />
+      )}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import type { QuestionType } from "../types/quiz"
-
+ 
 export interface ParsedQuestion {
   type: QuestionType
   questionText: string
@@ -428,7 +428,7 @@ export function parseQuizQuestionsFromText(inputText: string): ParseQuizResult {
       type,
       questionText: questionText || "Untitled Question",
       options:
-        type === "MULTIPLE_CHOICE"
+        type === "MULTIPLE_CHOICE" || type === "MULTIPLE_CORRECT"
           ? options.length >= 2
             ? options
             : options.length === 1

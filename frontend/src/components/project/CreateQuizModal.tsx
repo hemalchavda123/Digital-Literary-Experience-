@@ -337,19 +337,21 @@ export function CreateQuizModal({ projectId, documentId, annotationId, onClose }
                         />
                         <span className="text-xs font-medium text-gray-500">Marks</span>
                       </div>
-                      <div className="flex items-center gap-1.5 bg-rose-50/60 border border-rose-200 px-2 py-1 rounded">
-                        <ShieldAlert size={13} className="text-rose-500" />
-                        <span className="text-xs font-medium text-rose-700">Penalty:</span>
-                        <input
-                          type="number"
-                          step="0.25"
-                          min="0"
-                          value={q.negativeMarks || 0}
-                          onChange={(e) => updateQuestion(q.id, "negativeMarks", parseFloat(e.target.value) || 0)}
-                          className="w-14 p-1 border border-rose-200 rounded text-xs text-rose-900 bg-white"
-                          placeholder="0"
-                        />
-                      </div>
+                      {!(q.type === "MULTIPLE_CORRECT" && q.partialMarkingRule !== "NONE") && (
+                        <div className="flex items-center gap-1.5 bg-rose-50/60 border border-rose-200 px-2 py-1 rounded">
+                          <ShieldAlert size={13} className="text-rose-500" />
+                          <span className="text-xs font-medium text-rose-700">Penalty:</span>
+                          <input
+                            type="number"
+                            step="0.25"
+                            min="0"
+                            value={q.negativeMarks || 0}
+                            onChange={(e) => updateQuestion(q.id, "negativeMarks", parseFloat(e.target.value) || 0)}
+                            className="w-14 p-1 border border-rose-200 rounded text-xs text-rose-900 bg-white"
+                            placeholder="0"
+                          />
+                        </div>
+                      )}
                       {q.type === "MULTIPLE_CORRECT" && (
                         <div className="flex items-center gap-1.5 bg-emerald-50/60 border border-emerald-200 px-2 py-1 rounded">
                           <span className="text-xs font-medium text-emerald-800">Rule:</span>

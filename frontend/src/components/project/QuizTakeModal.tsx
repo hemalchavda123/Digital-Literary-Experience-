@@ -178,7 +178,7 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
     if (!socket || !initialQuiz.id) return
 
     // Announce presence in quiz room
-    socket.emit("join_quiz", { quizId: initialQuiz.id })
+    socket.emit("join_quiz", { quizId: initialQuiz.id, projectId })
 
     const handlePresence = (data: { quizId: string; activeCount: number }) => {
       if (data.quizId === initialQuiz.id) {
@@ -196,7 +196,7 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
     socket.on("submission_recorded", handleSubmission)
 
     return () => {
-      socket.emit("leave_quiz", { quizId: initialQuiz.id })
+      socket.emit("leave_quiz", { quizId: initialQuiz.id, projectId })
       socket.off("quiz_presence_update", handlePresence)
       socket.off("submission_recorded", handleSubmission)
     }
@@ -240,7 +240,7 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
 
     const interval = setInterval(() => {
       refreshQuizData(true)
-    }, 4000)
+    }, socket ? 30000 : 10000)
 
     return () => {
       window.removeEventListener("focus", handleFocus)
@@ -704,7 +704,12 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
                                   {q.marks} {q.marks === 1 ? "mark" : "marks"}
                                 </span>
                                 {q.type === "MULTIPLE_CORRECT" && (
-                                  <button
+                                  <>
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                                      <CheckSquare size={11} className="text-purple-600" />
+                                      Select All That Apply
+                                    </span>
+                                    <button
                                     type="button"
                                     onClick={() => setMarkingGuideOpen(true)}
                                     className="text-[11px] font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded flex items-center gap-1 cursor-pointer transition-colors"
@@ -719,6 +724,7 @@ export function QuizTakeModal({ quiz: initialQuiz, projectId, onClose }: Props) 
                                         : "Proportional with Penalty"}
                                     </span>
                                   </button>
+                                  </>
                                 )}
                                 {(q.negativeMarks ?? 0) > 0 && (
                                   <button

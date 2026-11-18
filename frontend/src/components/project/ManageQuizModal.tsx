@@ -604,6 +604,8 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
                               />
                               <span className="text-xs font-medium text-gray-500">Marks</span>
                             </div>
+                            {/* Hide negative marks field for MULTIPLE_CORRECT with PROPORTIONAL/POSITIVE rules — penalty is handled by partial marking rule */}
+                            {!(q.type === "MULTIPLE_CORRECT" && q.partialMarkingRule !== "NONE") && (
                             <div className="flex items-center gap-1.5 bg-rose-50/60 border border-rose-200 px-2 py-1 rounded">
                               <ShieldAlert size={13} className="text-rose-500" />
                               <span className="text-xs font-medium text-rose-700">Penalty:</span>
@@ -617,6 +619,7 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
                                 placeholder="0"
                               />
                             </div>
+                            )}
                             {q.type === "MULTIPLE_CORRECT" && (
                               <div className="flex items-center gap-1.5 bg-emerald-50/60 border border-emerald-200 px-2 py-1 rounded">
                                 <span className="text-xs font-medium text-emerald-800">Rule:</span>
@@ -833,7 +836,7 @@ export function ManageQuizModal({ projectId, quizId, onClose }: Props) {
 
                         {q.modelAnswer && (
                           <div className="mt-2 p-2.5 bg-amber-50/70 border border-amber-200 rounded text-xs">
-                            <span className="font-semibold text-amber-900 block mb-0.5">Model Answer / Rubric:</span>
+                            <span className="font-semibold text-amber-900 block mb-0.5">⚠️ Model Answer (hidden from students until answer reveal):</span>
                             <span className="text-gray-700 whitespace-pre-wrap">{q.modelAnswer}</span>
                           </div>
                         )}

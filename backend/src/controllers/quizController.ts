@@ -660,7 +660,7 @@ export const getMySubmission = async (req: Request, res: Response, next: NextFun
 
     const shouldRevealAnswers =
       isOwner ||
-      quiz.answerRevealMode === 'IMMEDIATE' ||
+      (quiz.answerRevealMode === 'IMMEDIATE' && !!submission) ||
       (quiz.answerRevealMode === 'AFTER_QUIZ_CLOSED' && quiz.status === 'CLOSED');
 
     // If quiz is closed and user is not owner and answers are NOT to be revealed: show total marks only
@@ -753,16 +753,22 @@ export const getMySubmission = async (req: Request, res: Response, next: NextFun
     }
 
     // Filter questions depending on answer reveal policy
-    const questionsWithRevealPolicy = quiz.questions.map((q) => {
-      if (shouldRevealAnswers) {
-        return q;
-      }
-      return {
-        ...q,
-        correctAnswer: null,
-        modelAnswer: null,
-      };
-    });
+    // If quiz is closed and answers should NOT be revealed, hide all questions (consistent with getQuizById)
+    let questionsForResponse: typeof quiz.questions;
+    if (!isOwner && quiz.status === 'CLOSED' && !shouldRevealAnswers) {
+      questionsForResponse = [];
+    } else {
+      questionsForResponse = quiz.questions.map((q) => {
+        if (shouldRevealAnswers) {
+          return q;
+        }
+        return {
+          ...q,
+          correctAnswer: null,
+          modelAnswer: null,
+        };
+      });
+    }
 
     res.json({
       submitted: !!submission && !isOutdated,
@@ -774,7 +780,7 @@ export const getMySubmission = async (req: Request, res: Response, next: NextFun
       questionStates,
       quiz: {
         ...quiz,
-        questions: questionsWithRevealPolicy,
+        questions: questionsForResponse,
       },
       showLeaderboard: quiz.showLeaderboard,
       shouldRevealAnswers,
@@ -881,6 +887,7 @@ export const getStudentPerformanceTracker = async (req: Request, res: Response, 
         submissions: {
           include: {
             user: { select: { id: true, username: true, email: true } },
+            answers: true,
           },
           orderBy: [
             { totalScore: 'desc' },
@@ -901,12 +908,33 @@ export const getStudentPerformanceTracker = async (req: Request, res: Response, 
     const performanceRecords: any[] = [];
 
     quizzes.forEach((quiz) => {
+      const validQuestionIds = new Set(quiz.questions.map((q) => q.id));
       const maxMarks = quiz.questions.reduce((sum, q) => sum + (q.marks || 0), 0);
-      const subIndex = quiz.submissions.findIndex((s) => s.userId === targetUserId);
+
+      const rankedSubmissions = quiz.submissions
+        .map((s) => {
+          const validAnswers = s.answers.filter((a) => validQuestionIds.has(a.questionId));
+          const effectiveScore =
+            validAnswers.length > 0
+              ? validAnswers.reduce((sum, a) => sum + (a.score || 0), 0)
+              : s.totalScore ?? 0;
+          return {
+            ...s,
+            effectiveScore,
+          };
+        })
+        .sort((a, b) => {
+          if (b.effectiveScore !== a.effectiveScore) {
+            return b.effectiveScore - a.effectiveScore;
+          }
+          return new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime();
+        });
+
+      const subIndex = rankedSubmissions.findIndex((s) => s.userId === targetUserId);
 
       if (subIndex !== -1) {
-        const sub = quiz.submissions[subIndex];
-        const score = sub.totalScore ?? 0;
+        const sub = rankedSubmissions[subIndex];
+        const score = sub.effectiveScore;
         const percentage = maxMarks > 0 ? Math.round((score / maxMarks) * 100) : 0;
 
         performanceRecords.push({
@@ -1032,23 +1060,22 @@ export const getQuizAnalytics = async (req: Request, res: Response, next: NextFu
     const passingCount = scores.filter((s) => maxPossibleScore > 0 && s / maxPossibleScore >= 0.5).length;
     const passRate = totalSubmissions > 0 ? Math.round((passingCount / totalSubmissions) * 100) : 0;
 
-    // Score Distribution Bins
+    // Score Distribution Bins (Clean continuous ranges, no floating-point gaps)
     const bins = [
-      { label: '0-20%', range: [0, 0.2], count: 0 },
-      { label: '21-40%', range: [0.201, 0.4], count: 0 },
-      { label: '41-60%', range: [0.401, 0.6], count: 0 },
-      { label: '61-80%', range: [0.601, 0.8], count: 0 },
-      { label: '81-100%', range: [0.801, 1.0], count: 0 },
+      { label: '0-20%', count: 0 },
+      { label: '21-40%', count: 0 },
+      { label: '41-60%', count: 0 },
+      { label: '61-80%', count: 0 },
+      { label: '81-100%', count: 0 },
     ];
 
     scores.forEach((score) => {
-      const pct = maxPossibleScore > 0 ? score / maxPossibleScore : 0;
-      for (const bin of bins) {
-        if (pct >= bin.range[0] && pct <= bin.range[1]) {
-          bin.count++;
-          break;
-        }
-      }
+      const pct = maxPossibleScore > 0 ? (score / maxPossibleScore) * 100 : 0;
+      if (pct <= 20) bins[0].count++;
+      else if (pct <= 40) bins[1].count++;
+      else if (pct <= 60) bins[2].count++;
+      else if (pct <= 80) bins[3].count++;
+      else bins[4].count++;
     });
 
     const scoreDistribution = bins.map((bin) => ({
@@ -1065,41 +1092,161 @@ export const getQuizAnalytics = async (req: Request, res: Response, next: NextFu
       const incorrectAnsCount = allAnswers.filter((a) => a.isCorrect === false).length;
       const correctPercentage = totalAnsCount > 0 ? Math.round((correctAnsCount / totalAnsCount) * 100) : 0;
 
-      // Map answer responses
-      const countsMap: Record<string, number> = {};
-      if ((q.type === 'MULTIPLE_CHOICE' || q.type === 'MULTIPLE_CORRECT') && q.options) {
+      // Map answer responses cleanly according to question type
+      let responseDistribution: { answerText: string; count: number; percentage: number; isCorrect: boolean | null }[] = [];
+
+      if (q.type === 'MULTIPLE_CHOICE' && q.options) {
+        let opts: string[] = [];
         try {
-          const opts: string[] = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
-          opts.forEach((opt) => (countsMap[opt] = 0));
+          opts = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
         } catch (e) {}
-      }
 
-      allAnswers.forEach((a) => {
-        const text = a.answerText ? a.answerText.trim() : '(No answer)';
-        if (countsMap[text] !== undefined) {
-          countsMap[text]++;
-        } else {
-          countsMap[text] = (countsMap[text] || 0) + 1;
-        }
-      });
+        const optionLabels = opts.map((opt, i) => `${String.fromCharCode(65 + i)}) ${opt}`);
+        const counts: number[] = new Array(opts.length).fill(0);
+        let noAnswerCount = 0;
+        const otherCounts: Record<string, number> = {};
 
-      const responseDistribution = Object.entries(countsMap).map(([answerText, count]) => {
-        let isCorrect: boolean | null = null;
-        if (q.correctAnswer) {
-          if (q.type === 'MULTIPLE_CORRECT') {
-            const normalize = (s: string) => s.split(',').map(x => x.trim().toUpperCase()).filter(Boolean).sort().join(',');
-            isCorrect = normalize(answerText) === normalize(q.correctAnswer);
-          } else {
-            isCorrect = answerText.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase();
+        allAnswers.forEach((a) => {
+          const text = (a.answerText || '').trim();
+          if (!text) {
+            noAnswerCount++;
+            return;
           }
+          // Check letter match (e.g. "A", "B")
+          const letterMatch = text.match(/^[A-Za-z]$/);
+          if (letterMatch) {
+            const idx = letterMatch[0].toUpperCase().charCodeAt(0) - 65;
+            if (idx >= 0 && idx < opts.length) {
+              counts[idx]++;
+              return;
+            }
+          }
+          // Check option text match
+          const optIdx = opts.findIndex(
+            (o, i) =>
+              o.trim().toLowerCase() === text.toLowerCase() ||
+              optionLabels[i].toLowerCase() === text.toLowerCase()
+          );
+          if (optIdx !== -1) {
+            counts[optIdx]++;
+            return;
+          }
+          otherCounts[text] = (otherCounts[text] || 0) + 1;
+        });
+
+        const correctNorm = (q.correctAnswer || '').trim().toUpperCase();
+        responseDistribution = optionLabels.map((label, i) => {
+          const letter = String.fromCharCode(65 + i);
+          const isCorrect =
+            correctNorm === letter ||
+            correctNorm === opts[i].trim().toUpperCase() ||
+            correctNorm === label.toUpperCase();
+          const count = counts[i];
+          return {
+            answerText: label,
+            count,
+            percentage: totalAnsCount > 0 ? Math.round((count / totalAnsCount) * 100) : 0,
+            isCorrect,
+          };
+        });
+
+        if (noAnswerCount > 0) {
+          responseDistribution.push({
+            answerText: '(No answer)',
+            count: noAnswerCount,
+            percentage: totalAnsCount > 0 ? Math.round((noAnswerCount / totalAnsCount) * 100) : 0,
+            isCorrect: false,
+          });
         }
-        return {
-          answerText,
-          count,
-          percentage: totalAnsCount > 0 ? Math.round((count / totalAnsCount) * 100) : 0,
-          isCorrect,
-        };
-      });
+
+        Object.entries(otherCounts).forEach(([otherText, count]) => {
+          responseDistribution.push({
+            answerText: otherText,
+            count,
+            percentage: totalAnsCount > 0 ? Math.round((count / totalAnsCount) * 100) : 0,
+            isCorrect: false,
+          });
+        });
+      } else if (q.type === 'MULTIPLE_CORRECT' && q.options) {
+        let opts: string[] = [];
+        try {
+          opts = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
+        } catch (e) {}
+
+        const optionLabels = opts.map((opt, i) => `${String.fromCharCode(65 + i)}) ${opt}`);
+        const counts: number[] = new Array(opts.length).fill(0);
+        let noAnswerCount = 0;
+
+        const correctSet = new Set(
+          (q.correctAnswer || '')
+            .split(',')
+            .map((s) => s.trim().toUpperCase())
+            .filter(Boolean)
+        );
+
+        allAnswers.forEach((a) => {
+          const text = (a.answerText || '').trim();
+          if (!text) {
+            noAnswerCount++;
+            return;
+          }
+          const userSelectedLetters = new Set(
+            text
+              .split(',')
+              .map((s) => s.trim().toUpperCase())
+              .filter(Boolean)
+          );
+
+          opts.forEach((o, i) => {
+            const letter = String.fromCharCode(65 + i);
+            if (
+              userSelectedLetters.has(letter) ||
+              userSelectedLetters.has(o.trim().toUpperCase())
+            ) {
+              counts[i]++;
+            }
+          });
+        });
+
+        responseDistribution = optionLabels.map((label, i) => {
+          const letter = String.fromCharCode(65 + i);
+          const isCorrect = correctSet.has(letter) || correctSet.has(opts[i].trim().toUpperCase());
+          const count = counts[i];
+          return {
+            answerText: label,
+            count,
+            percentage: totalAnsCount > 0 ? Math.round((count / totalAnsCount) * 100) : 0,
+            isCorrect,
+          };
+        });
+
+        if (noAnswerCount > 0) {
+          responseDistribution.push({
+            answerText: '(No answer)',
+            count: noAnswerCount,
+            percentage: totalAnsCount > 0 ? Math.round((noAnswerCount / totalAnsCount) * 100) : 0,
+            isCorrect: false,
+          });
+        }
+      } else {
+        const countsMap: Record<string, number> = {};
+        allAnswers.forEach((a) => {
+          const text = a.answerText ? a.answerText.trim() : '(No answer)';
+          countsMap[text] = (countsMap[text] || 0) + 1;
+        });
+
+        responseDistribution = Object.entries(countsMap).map(([answerText, count]) => {
+          const isCorrect = q.correctAnswer
+            ? answerText.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase()
+            : null;
+          return {
+            answerText,
+            count,
+            percentage: totalAnsCount > 0 ? Math.round((count / totalAnsCount) * 100) : 0,
+            isCorrect,
+          };
+        });
+      }
 
       return {
         id: q.id,
@@ -1393,7 +1540,7 @@ export const exportQuizAnswersExcel = async (req: Request, res: Response, next: 
         const ans = answersMap.get(q.id);
         const ansText = ans?.answerText && ans.answerText.trim() !== '' ? ans.answerText : '(No Answer)';
         const result = ans
-          ? (ans.isCorrect === true ? 'Correct' : ans.isCorrect === false ? 'Incorrect' : 'Submitted')
+          ? (ans.isCorrect === true ? 'Correct' : (ans.score && ans.score > 0 ? 'Partial Credit' : 'Incorrect'))
           : 'No Answer';
         const score = ans?.score ?? 0;
         rowValues.push(ansText, result, score);
@@ -1416,6 +1563,10 @@ export const exportQuizAnswersExcel = async (req: Request, res: Response, next: 
         if (cellValue === 'Correct') {
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } }; // light green
           cell.font = { color: { argb: 'FF166534' }, bold: true };
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        } else if (cellValue === 'Partial Credit') {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } }; // light amber
+          cell.font = { color: { argb: 'FFB45309' }, bold: true };
           cell.alignment = { vertical: 'middle', horizontal: 'center' };
         } else if (cellValue === 'Incorrect') {
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } }; // light red
@@ -1465,7 +1616,7 @@ export const exportQuizAnswersExcel = async (req: Request, res: Response, next: 
         const ans = answersMap.get(q.id);
         const ansText = ans?.answerText && ans.answerText.trim() !== '' ? ans.answerText : '(No Answer)';
         const result = ans
-          ? (ans.isCorrect === true ? 'Correct' : ans.isCorrect === false ? 'Incorrect' : 'Submitted')
+          ? (ans.isCorrect === true ? 'Correct' : (ans.score && ans.score > 0 ? 'Partial Credit' : 'Incorrect'))
           : 'No Answer';
         const score = ans?.score ?? 0;
 
@@ -1497,6 +1648,9 @@ export const exportQuizAnswersExcel = async (req: Request, res: Response, next: 
             if (cellValue === 'Correct') {
               cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } };
               cell.font = { color: { argb: 'FF166534' }, bold: true };
+            } else if (cellValue === 'Partial Credit') {
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
+              cell.font = { color: { argb: 'FFB45309' }, bold: true };
             } else if (cellValue === 'Incorrect') {
               cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
               cell.font = { color: { argb: 'FF991B1B' }, bold: true };

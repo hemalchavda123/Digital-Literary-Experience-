@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react"
 import type { Quiz, QuizSubmission } from "@/types/quiz"
 import { getSubmissions, downloadQuizAnswersExcel } from "@/lib/api/quizzes"
-import { FileSpreadsheet } from "lucide-react"
+import { FileSpreadsheet, TrendingUp } from "lucide-react"
+import { StudentPerformanceModal } from "./StudentPerformanceModal"
 
 interface Props {
   quiz: Quiz
@@ -15,6 +16,7 @@ export function QuizSubmissionsModal({ quiz, projectId, onClose }: Props) {
   const [submissions, setSubmissions] = useState<QuizSubmission[]>([])
   const [loading, setLoading] = useState(true)
   const [downloading, setDownloading] = useState(false)
+  const [selectedStudent, setSelectedStudent] = useState<{ userId: string; username: string } | null>(null)
 
   const handleDownloadExcel = async () => {
     try {
@@ -93,7 +95,19 @@ export function QuizSubmissionsModal({ quiz, projectId, onClose }: Props) {
               {submissions.map((sub) => (
                 <div key={sub.id} className="border border-gray-200 rounded-md p-4 bg-gray-50 flex flex-col gap-3">
                   <div className="flex justify-between items-center border-b border-gray-200 pb-2">
-                    <div className="font-semibold text-gray-900">{sub.user?.username || "Unknown User"}</div>
+                    <div className="flex items-center gap-2.5">
+                      <div className="font-semibold text-gray-900">{sub.user?.username || "Unknown User"}</div>
+                      {sub.user?.email && <span className="text-xs text-gray-400">({sub.user.email})</span>}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedStudent({ userId: sub.userId, username: sub.user?.username || "Student" })}
+                        className="ml-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded flex items-center gap-1 transition-colors"
+                        title="View student's quiz trajectory across this project"
+                      >
+                        <TrendingUp size={11} className="text-indigo-600" />
+                        Performance Trajectory
+                      </button>
+                    </div>
                     <div className="flex items-center gap-4 text-sm font-medium">
                       <span className="text-gray-500">
                         {new Date(sub.submittedAt).toLocaleString()}
@@ -113,8 +127,8 @@ export function QuizSubmissionsModal({ quiz, projectId, onClose }: Props) {
                           <span className="text-gray-600 font-medium text-xs uppercase tracking-wider">Answer {i + 1}</span>
                           <span className="text-gray-900 bg-white p-2 border border-gray-200 rounded">{ans.answerText || <span className="text-gray-400 italic">No answer provided</span>}</span>
                           {ans.isCorrect !== null && (
-                            <span className={`text-xs font-medium ${ans.isCorrect ? "text-green-600" : "text-red-500"}`}>
-                              {ans.isCorrect ? "✓ Correct" : "✗ Incorrect"} ({ans.score} marks)
+                            <span className={`text-xs font-medium ${ans.isCorrect ? "text-green-600" : (ans.score || 0) > 0 ? "text-amber-600 font-semibold" : "text-red-500"}`}>
+                              {ans.isCorrect ? "✓ Correct" : (ans.score || 0) > 0 ? "⚡ Partial Credit" : "✗ Incorrect"} ({ans.score} marks)
                             </span>
                           )}
                         </div>
@@ -129,6 +143,15 @@ export function QuizSubmissionsModal({ quiz, projectId, onClose }: Props) {
           )}
         </div>
       </div>
+
+      {selectedStudent && (
+        <StudentPerformanceModal
+          projectId={projectId}
+          userId={selectedStudent.userId}
+          studentName={selectedStudent.username}
+          onClose={() => setSelectedStudent(null)}
+        />
+      )}
     </div>
   )
 }
