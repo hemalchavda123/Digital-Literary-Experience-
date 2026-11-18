@@ -14,6 +14,7 @@ import userRoutes from './routes/userRoutes';
 import announcementRoutes from './routes/announcementRoutes';
 import assignmentRoutes from './routes/assignmentRoutes';
 import quizRoutes from './routes/quizRoutes';
+import adminRoutes from './routes/adminRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { initSocket } from './socket';
 
@@ -96,6 +97,7 @@ app.use('/api/projects/:projectId/announcements', announcementRoutes);
 app.use('/api/projects/:projectId/assignments', assignmentRoutes);
 app.use('/api/projects/:projectId/quizzes', quizRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/admin', authLimiter, adminRoutes);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);
