@@ -10,16 +10,17 @@ datasource db {
 }
 
 model User {
-  id                String    @id @default(uuid())
-  email             String    @unique
-  username          String    @unique
+  id                String     @id @default(uuid())
+  email             String     @unique
+  username          String     @unique
   password          String
+  systemRole        SystemRole @default(USER)
   resetToken        String?
   resetTokenExpiry  DateTime?
-  isVerified        Boolean   @default(false)
+  isVerified        Boolean    @default(false)
   verificationCode  String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
   profileImage      String?
 
   projects           Project[]
@@ -35,6 +36,12 @@ model User {
   @@index([username])
 }
 
+enum SystemRole {
+  USER
+  ADMIN
+  SUPERADMIN
+}
+
 enum Role {
   VIEWER
   EDITOR
@@ -44,6 +51,7 @@ model Project {
   id                          String   @id @default(uuid())
   name                        String
   ownerId                     String
+  allowedEmailPatterns        String?
   defaultCanViewAnnotations   Boolean  @default(false)
   defaultCanAnnotate          Boolean  @default(true)
   defaultCanViewAdminAnnotations Boolean @default(false)
@@ -330,4 +338,11 @@ model QuizAnswer {
 
   @@index([submissionId])
   @@index([questionId])
+}
+
+model SystemSetting {
+  key         String   @id
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
 }
