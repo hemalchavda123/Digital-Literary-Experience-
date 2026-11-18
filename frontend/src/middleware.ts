@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 // Routes that don't require authentication
-const PUBLIC_ROUTES = ['/signup2', '/signup', '/login', '/forgot-password', '/auth']
+const PUBLIC_ROUTES = ['/signup2', '/signup', '/login', '/forgot-password', '/auth', '/admin/login']
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -25,6 +25,13 @@ export function middleware(request: NextRequest) {
   const accessToken = request.cookies.get('accessToken')?.value
 
   if (!accessToken) {
+    // If attempting to access admin routes without a session, redirect to admin login
+    if (pathname.startsWith('/admin')) {
+      const redirectUrl = request.nextUrl.clone()
+      redirectUrl.pathname = '/admin/login'
+      return NextResponse.redirect(redirectUrl)
+    }
+
     // No token — redirect to signup/login page
     const redirectUrl = request.nextUrl.clone()
     redirectUrl.pathname = '/signup2'

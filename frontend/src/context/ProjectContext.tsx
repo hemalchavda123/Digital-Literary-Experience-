@@ -94,7 +94,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    const publicRoutes = ["/signup2", "/signup", "/login", "/forgot-password", "/auth"]
+    const publicRoutes = ["/signup2", "/signup", "/login", "/forgot-password", "/auth", "/admin/login"]
     if (publicRoutes.some((route) => window.location.pathname === route || window.location.pathname.startsWith(route + "/"))) {
       setLoading(false)
       return
