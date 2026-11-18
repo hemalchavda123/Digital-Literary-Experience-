@@ -9,6 +9,7 @@ declare global {
         userId: string;
         email: string;
         username: string;
+        systemRole?: 'USER' | 'ADMIN' | 'SUPERADMIN';
       };
     }
   }
@@ -71,7 +72,8 @@ export const authMiddleware = async (
     req.user = {
       userId: decoded.userId,
       email: decoded.email,
-      username: decoded.username
+      username: decoded.username,
+      systemRole: decoded.systemRole,
     };
 
     // Call next() to proceed to route handler
@@ -85,4 +87,52 @@ export const authMiddleware = async (
       }
     });
   }
+};
+
+/**
+ * Middleware that requires the authenticated user to be an ADMIN or SUPERADMIN.
+ * Used for admin portal endpoints.
+ */
+export const adminMiddleware = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  await authMiddleware(req, res, async () => {
+    const userRole = req.user?.systemRole;
+    if (userRole !== 'ADMIN' && userRole !== 'SUPERADMIN') {
+      res.status(403).json({
+        error: {
+          message: 'Access denied: Admin credentials required',
+          code: 'FORBIDDEN_NOT_ADMIN'
+        }
+      });
+      return;
+    }
+    next();
+  });
+};
+
+/**
+ * Middleware that strictly requires SUPERADMIN privileges.
+ * Used for managing system-wide rules, promoting/demoting admins, etc.
+ */
+export const superAdminMiddleware = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  await authMiddleware(req, res, async () => {
+    const userRole = req.user?.systemRole;
+    if (userRole !== 'SUPERADMIN') {
+      res.status(403).json({
+        error: {
+          message: 'Access denied: Superadmin privileges required',
+          code: 'FORBIDDEN_NOT_SUPERADMIN'
+        }
+      });
+      return;
+    }
+    next();
+  });
 };

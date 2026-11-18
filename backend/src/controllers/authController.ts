@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import prisma from '../config/db';
 import userService, { SafeUser } from '../services/userService';
 import passwordService from '../services/passwordService';
 import { jwtService } from '../services/jwtService';
@@ -286,6 +287,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       userId: user.id,
       email: user.email,
       username: user.username,
+      systemRole: user.systemRole as any,
     });
     const refreshToken = jwt.generateRefreshToken({
       userId: user.id,
@@ -463,6 +465,7 @@ export const refresh = async (req: Request, res: Response): Promise<void> => {
       userId: user.id,
       email: user.email,
       username: user.username,
+      systemRole: user.systemRole as any,
     });
 
     res.json({ accessToken });
@@ -668,6 +671,103 @@ export const getCurrentUser = async (req: Request, res: Response): Promise<void>
     res.status(500).json({
       error: {
         message: 'An unexpected error occurred',
+        code: 'INTERNAL_ERROR',
+      },
+    });
+  }
+};
+
+/**
+ * Admin portal login
+ * POST /api/admin/login
+ * Body: { email, password }
+ * ONLY users designated as ADMIN or SUPERADMIN are permitted to log in.
+ */
+export const adminLogin = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      res.status(400).json({
+        error: {
+          message: 'Email and password are required',
+          code: 'VALIDATION_ERROR',
+        },
+      });
+      return;
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Check designated superadmins list for automatic role alignment
+    const DESIGNATED_SUPERADMINS = ['202301131@dau.ac.in', '202301451@dau.ac.in'];
+    let user = await userService.findUserByEmail(cleanEmail);
+
+    if (!user) {
+      res.status(401).json({
+        error: {
+          message: 'Invalid credentials or not authorized as admin',
+          code: 'INVALID_CREDENTIALS',
+        },
+      });
+      return;
+    }
+
+    // Auto-promote designated superadmins if their account was previously USER
+    if (DESIGNATED_SUPERADMINS.includes(cleanEmail) && user.systemRole !== 'SUPERADMIN') {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { systemRole: 'SUPERADMIN' as any },
+      });
+      user = await userService.findUserByEmail(cleanEmail);
+    }
+
+    // Verify systemRole is ADMIN or SUPERADMIN
+    if (user?.systemRole !== 'ADMIN' && user?.systemRole !== 'SUPERADMIN') {
+      res.status(403).json({
+        error: {
+          message: 'Access denied: You do not have administrator permissions',
+          code: 'FORBIDDEN_NOT_ADMIN',
+        },
+      });
+      return;
+    }
+
+    // Verify password
+    const isPasswordValid = await passwordService.comparePassword(password, user.password);
+    if (!isPasswordValid) {
+      res.status(401).json({
+        error: {
+          message: 'Invalid credentials',
+          code: 'INVALID_CREDENTIALS',
+        },
+      });
+      return;
+    }
+
+    // Generate tokens
+    const jwt = jwtService();
+    const accessToken = jwt.generateAccessToken({
+      userId: user.id,
+      email: user.email,
+      username: user.username,
+      systemRole: user.systemRole as any,
+    });
+    const refreshToken = jwt.generateRefreshToken({
+      userId: user.id,
+    });
+
+    const { password: _, ...userWithoutPassword } = user;
+    res.json({
+      accessToken,
+      refreshToken,
+      user: userWithoutPassword,
+    });
+  } catch (error) {
+    console.error('Admin login error:', error);
+    res.status(500).json({
+      error: {
+        message: 'An unexpected error occurred during admin authentication',
         code: 'INTERNAL_ERROR',
       },
     });

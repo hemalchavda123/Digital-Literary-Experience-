@@ -13,11 +13,14 @@ import { User } from '@prisma/client';
  * - 6.1: Define User model with required fields and relationships
  */
 
+const DESIGNATED_SUPERADMINS = ['202301131@dau.ac.in', '202301451@dau.ac.in'];
+
 export interface CreateUserInput {
   email: string;
   username: string;
   password: string; // hashed password
   verificationCode?: string;
+  systemRole?: 'USER' | 'ADMIN' | 'SUPERADMIN';
 }
 
 // User type without password field for safe returns
@@ -30,12 +33,16 @@ class UserService {
    * @returns User object without password field
    */
   async createUser(data: CreateUserInput): Promise<SafeUser> {
+    const isSuperAdminEmail = DESIGNATED_SUPERADMINS.includes(data.email.trim().toLowerCase());
+    const assignedRole = isSuperAdminEmail ? 'SUPERADMIN' : (data.systemRole || 'USER');
+
     const user = await prisma.user.create({
       data: {
         email: data.email,
         username: data.username,
         password: data.password,
         verificationCode: data.verificationCode,
+        systemRole: assignedRole as any,
       },
     });
 

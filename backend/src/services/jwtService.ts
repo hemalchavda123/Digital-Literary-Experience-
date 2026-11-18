@@ -4,6 +4,7 @@ export interface TokenPayload {
   userId: string;
   email: string;
   username: string;
+  systemRole?: 'USER' | 'ADMIN' | 'SUPERADMIN';
 }
 
 export interface RefreshPayload {
