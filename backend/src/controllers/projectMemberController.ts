@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
+import { isEmailAllowedByPatterns } from '../utils/patternMatcher';
 
 /**
  * Generate a shareable invite link for a project
@@ -77,6 +78,24 @@ export const joinProjectViaLink = async (req: Request, res: Response): Promise<v
     if (invite.project.ownerId === userId) {
       res.status(400).json({ error: 'You are already the owner of this project' });
       return;
+    }
+
+    // Email Pattern Restriction Check
+    // If the project owner/admin configured allowedEmailPatterns (e.g. 2023*@dau.ac.in),
+    // only matching emails (or Superadmins) are allowed to join.
+    const userEmail = req.user?.email || '';
+    const userRole = req.user?.systemRole;
+    const isSuperAdmin = userRole === 'SUPERADMIN';
+
+    if (!isSuperAdmin && invite.project.allowedEmailPatterns) {
+      const isAllowed = isEmailAllowedByPatterns(userEmail, invite.project.allowedEmailPatterns);
+      if (!isAllowed) {
+        res.status(403).json({
+          error: `Access restricted: Only emails matching "${invite.project.allowedEmailPatterns}" are allowed to join this project. Your email is ${userEmail}.`,
+          code: 'EMAIL_RESTRICTED',
+        });
+        return;
+      }
     }
 
     // Check if already a member
@@ -470,6 +489,17 @@ export const inviteUserByEmail = async (req: Request, res: Response): Promise<vo
     if (user.id === currentUserId) {
       res.status(400).json({ error: 'Cannot invite yourself' });
       return;
+    }
+
+    // Check project allowed email pattern
+    const isSuperAdmin = req.user?.systemRole === 'SUPERADMIN';
+    if (!isSuperAdmin && project.allowedEmailPatterns) {
+      if (!isEmailAllowedByPatterns(user.email, project.allowedEmailPatterns)) {
+        res.status(403).json({
+          error: `Cannot invite: User email (${user.email}) does not match the project allowed pattern "${project.allowedEmailPatterns}"`,
+        });
+        return;
+      }
     }
 
     // Check if already a member
